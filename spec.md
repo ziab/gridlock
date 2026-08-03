@@ -119,7 +119,7 @@ struct HitEvent {
 | :--- | :--- | :--- | :--- | :--- |
 | `bars_window` | History Length | Choice | 1 Bar, 2 Bars, 4 Bars, 8 Bars | 4 Bars |
 | `subdivision` | Grid Subdivision | Choice | 1/8, 1/8T, 1/16, 1/16T, 1/32 | 1/16 |
-| `tolerance_ms`| Timing Tolerance | Float | 2.0 ms to 30.0 ms | 10.0 ms |
+| `tolerance_ms`| Timing Tolerance | Float | 0.0 ms to 100.0 ms | 20.0 ms |
 | `latency_offset_ms`| Latency Compensation | Float | -500.0 ms to 500.0 ms | 0.0 ms |
 | `min_velocity`| Velocity Noise Floor | Int | 1 to 127 | 5 |
 | `internal_bpm`| Metronome BPM | Float | 40.0 to 300.0 BPM | 120.0 BPM |
@@ -137,11 +137,12 @@ struct HitEvent {
 
 ### 4.4 GUI Component & Continuous Color Mapping (`GridComponent.h` / `.cpp`)
 
-* **Continuous Color Gradient Function**:
-  - `normalizedDeviation` $\in [-1.0, 1.0]$:
-  - If $ \text{dev} == 0 $: Emerald Green (`#00FF88`)
-  - If $ \text{dev} < 0 $ (Rush): Interpolate Green $\rightarrow$ Yellow $\rightarrow$ Orange $\rightarrow$ Electric Red (`#FF1744`) as $|\text{dev}|$ approaches 1.0.
-  - If $ \text{dev} > 0 $ (Drag): Interpolate Green $\rightarrow$ Cyan $\rightarrow$ Blue/Violet $\rightarrow$ Vivid Purple (`#D500F9`) as $\text{dev}$ approaches 1.0.
+* **Tolerance & Falloff Color Gradient Algorithm**:
+  - `MaxErrorMs` $= (\text{subdivisionPpq} / 2.0) \times (60.0 / \text{BPM}) \times 1000.0$.
+  - **Within Tolerance ($|\Delta\text{ms}| \le \text{Tolerance}$):** Pure Emerald Green (`#00FF88`).
+  - **Beyond Tolerance ($|\Delta\text{ms}| > \text{Tolerance}$):** Falloff ratio $t = \text{clamp}\left(\frac{|\Delta\text{ms}| - \text{Tolerance}}{\text{MaxErrorMs} - \text{Tolerance}}, 0.0, 1.0\right)$.
+    - **Rush ($\Delta\text{ms} < 0$):** Smooth transition Green $\rightarrow$ Yellow $\rightarrow$ Orange $\rightarrow$ Electric Red (`#FF1744`) as $t \rightarrow 1.0$.
+    - **Drag ($\Delta\text{ms} > 0$):** Smooth transition Green $\rightarrow$ Cyan $\rightarrow$ Blue/Violet $\rightarrow$ Vivid Purple (`#D500F9`) as $t \rightarrow 1.0$.
 
 ---
 

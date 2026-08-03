@@ -24,7 +24,7 @@ public:
                       float bpm = 120.0f);
     void clearEvents();
 
-    static juce::Colour getContinuousHitColor(float normalizedDeviation) noexcept;
+    static juce::Colour getContinuousHitColor(float deltaMs, float toleranceMs, float maxErrorMs) noexcept;
 
 private:
     struct DrumLaneInfo {

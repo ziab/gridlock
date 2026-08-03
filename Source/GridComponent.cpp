@@ -24,13 +24,22 @@ int GridComponent::getLaneIndexForNote(uint8_t note) const noexcept
     return 5;                                             // Other
 }
 
-juce::Colour GridComponent::getContinuousHitColor(float normalizedDeviation) noexcept
+juce::Colour GridComponent::getContinuousHitColor(float deltaMs, float toleranceMs, float maxErrorMs) noexcept
 {
-    const float dev = std::clamp(normalizedDeviation, -1.0f, 1.0f);
+    const float absDelta = std::abs(deltaMs);
 
-    if (dev < 0.0f)
+    // Everything inside tolerance threshold is 100% Emerald Green
+    if (absDelta <= toleranceMs)
     {
-        const float t = std::abs(dev);
+        return juce::Colour(0xff00ff88); // Pure Emerald Green
+    }
+
+    // Beyond tolerance: Fall off to Red (Rush) or Purple (Drag) up to maxErrorMs (half grid subdivision)
+    const float denom = std::max(0.001f, maxErrorMs - toleranceMs);
+    const float t = std::clamp((absDelta - toleranceMs) / denom, 0.0f, 1.0f);
+
+    if (deltaMs < 0.0f) // Rush / Early -> Green -> Yellow -> Orange -> Electric Red
+    {
         if (t <= 0.5f) {
             const float k = t / 0.5f;
             return juce::Colour::fromRGB(
@@ -47,9 +56,8 @@ juce::Colour GridComponent::getContinuousHitColor(float normalizedDeviation) noe
             );
         }
     }
-    else
+    else // Drag / Late -> Green -> Cyan -> Blue/Violet -> Vivid Purple
     {
-        const float t = dev;
         if (t <= 0.5f) {
             const float k = t / 0.5f;
             return juce::Colour::fromRGB(
@@ -84,7 +92,7 @@ void GridComponent::updateEvents(const std::vector<HitEvent>& events,
     subdivisionPpq = (gridSubdivisionPpq > 0.0) ? gridSubdivisionPpq : 0.25;
     timeSigNumerator = (timeSigNum > 0) ? timeSigNum : 4;
     displayMsLabels = showMsLabels;
-    toleranceMsVal = (toleranceMs > 0.0f) ? toleranceMs : 10.0f;
+    toleranceMsVal = (toleranceMs >= 0.0f) ? toleranceMs : 20.0f;
     latencyOffsetMsVal = latencyOffsetMs;
     bpmVal = (bpm > 0.0f) ? bpm : 120.0f;
     repaint();
@@ -227,6 +235,7 @@ void GridComponent::paint(juce::Graphics& g)
 
     // Render Hit Events with Live Real-Time Latency & Tolerance Recalculation
     const double userLatencyPpq = (static_cast<double>(latencyOffsetMsVal) / 1000.0) * (static_cast<double>(bpmVal) / 60.0);
+    const float maxErrorMs = static_cast<float>((subdivisionPpq / 2.0) * (60.0 / static_cast<double>(bpmVal)) * 1000.0);
     const float nodeRadius = 11.0f; // High visibility hit nodes
 
     for (const auto& event : activeEvents)
@@ -240,18 +249,17 @@ void GridComponent::paint(juce::Graphics& g)
         const int laneIndex = getLaneIndexForNote(event.noteNumber);
         if (laneIndex < 0 || laneIndex >= numLanes) continue;
 
-        // Recalculate Delta MS and Normalized Deviation live for all displayed notes
+        // Recalculate Delta MS live using current user latency & subdivision settings
         const double nearestGridPpq = std::round(compPpq / subdivisionPpq) * subdivisionPpq;
         const double deltaPpq = compPpq - nearestGridPpq;
         const double liveDeltaMs = (deltaPpq / (static_cast<double>(bpmVal) / 60.0)) * 1000.0;
-        const float liveNormDev = std::clamp(static_cast<float>(liveDeltaMs / static_cast<double>(toleranceMsVal)), -1.0f, 1.0f);
 
         const float normalizedX = static_cast<float>((compPpq - minPpq) / totalPpqWindow);
         const float hitX = canvasLeft + (normalizedX * canvasWidth);
         const float hitY = laneAreaTop + (laneIndex * laneHeight) + (laneHeight * 0.5f);
 
-        // Continuous Dynamic Color Interpolation based on live normalized deviation
-        const juce::Colour fillColour = getContinuousHitColor(liveNormDev);
+        // Continuous Dynamic Color Interpolation: 100% Emerald Green within tolerance, falloff to Red/Purple up to maxErrorMs
+        const juce::Colour fillColour = getContinuousHitColor(static_cast<float>(liveDeltaMs), toleranceMsVal, maxErrorMs);
 
         const auto hitRect = juce::Rectangle<float>(hitX - nodeRadius, hitY - nodeRadius, nodeRadius * 2.0f, nodeRadius * 2.0f);
 

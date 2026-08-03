@@ -40,8 +40,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ "tolerance_ms", 1 },
         "Timing Tolerance",
-        juce::NormalisableRange<float>(2.0f, 30.0f, 0.5f),
-        10.0f
+        juce::NormalisableRange<float>(0.0f, 100.0f, 0.5f),
+        20.0f
     ));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
