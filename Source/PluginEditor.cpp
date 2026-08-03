@@ -13,7 +13,7 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
         const auto area = display->userArea;
         const int minW = std::min(960, area.getWidth() / 2);
         const int minH = std::min(480, area.getHeight() / 2);
-        const int defaultW = std::min(1380, static_cast<int>(area.getWidth() * 0.82));
+        const int defaultW = std::min(1420, static_cast<int>(area.getWidth() * 0.85));
         const int defaultH = std::min(680, static_cast<int>(area.getHeight() * 0.8));
 
         setResizeLimits (minW, minH, area.getWidth(), area.getHeight());
@@ -22,7 +22,7 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     else
     {
         setResizeLimits (960, 480, 1920, 1080);
-        setSize (1380, 640);
+        setSize (1420, 640);
     }
 
     addAndMakeVisible (gridComponent);
@@ -46,6 +46,13 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     toleranceLabel.attachToComponent (&toleranceSlider, false);
     toleranceLabel.setFont (juce::Font (11.0f, juce::Font::bold));
     toleranceLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
+
+    latencySlider.setSliderStyle (juce::Slider::LinearBar);
+    latencySlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 45, 20);
+    addAndMakeVisible (latencySlider);
+    latencyLabel.attachToComponent (&latencySlider, false);
+    latencyLabel.setFont (juce::Font (11.0f, juce::Font::bold));
+    latencyLabel.setColour (juce::Label::textColourId, juce::Colour (0xff38bdf8));
 
     velocitySlider.setSliderStyle (juce::Slider::LinearBar);
     velocitySlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 35, 20);
@@ -130,6 +137,7 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     barsAttachment        = std::make_unique<ComboBoxAttachment>(apvts, "bars_window",         barsComboBox);
     subdivisionAttachment = std::make_unique<ComboBoxAttachment>(apvts, "subdivision",         subdivisionComboBox);
     toleranceAttachment   = std::make_unique<SliderAttachment>  (apvts, "tolerance_ms",        toleranceSlider);
+    latencyAttachment     = std::make_unique<SliderAttachment>  (apvts, "latency_offset_ms",   latencySlider);
     velocityAttachment    = std::make_unique<SliderAttachment>  (apvts, "min_velocity",        velocitySlider);
     bpmAttachment         = std::make_unique<SliderAttachment>  (apvts, "internal_bpm",        bpmSlider);
 
@@ -264,39 +272,42 @@ void MidiGridAnalyzerAudioProcessorEditor::resized()
     subdivisionComboBox.setBounds (x, topMargin, 74, controlHeight);
     x += 78;
 
-    toleranceSlider.setBounds (x, topMargin, 90, controlHeight);
-    x += 94;
+    toleranceSlider.setBounds (x, topMargin, 85, controlHeight);
+    x += 89;
 
-    velocitySlider.setBounds (x, topMargin, 70, controlHeight);
-    x += 74;
+    latencySlider.setBounds (x, topMargin, 85, controlHeight);
+    x += 89;
 
-    bpmSlider.setBounds (x, topMargin, 80, controlHeight);
-    x += 84;
+    velocitySlider.setBounds (x, topMargin, 65, controlHeight);
+    x += 69;
+
+    bpmSlider.setBounds (x, topMargin, 75, controlHeight);
+    x += 79;
 
     timeSigComboBox.setBounds (x, topMargin, 64, controlHeight);
     x += 68;
 
-    clickSubComboBox.setBounds (x, topMargin, 90, controlHeight);
-    x += 94;
+    clickSubComboBox.setBounds (x, topMargin, 85, controlHeight);
+    x += 89;
 
     clickSoundComboBox.setBounds (x, topMargin, 95, controlHeight);
     x += 99;
 
-    clickVolumeSlider.setBounds (x, topMargin, 70, controlHeight);
-    x += 74;
+    clickVolumeSlider.setBounds (x, topMargin, 65, controlHeight);
+    x += 69;
 
-    clickPanSlider.setBounds (x, topMargin, 70, controlHeight);
-    x += 74;
+    clickPanSlider.setBounds (x, topMargin, 65, controlHeight);
+    x += 69;
 
     clickToggleButton.setBounds (x, topMargin, 75, controlHeight);
     x += 79;
 
-    pauseButton.setBounds (x, topMargin, 70, controlHeight);
-    x += 74;
+    pauseButton.setBounds (x, topMargin, 65, controlHeight);
+    x += 69;
 
-    showMsButton.setBounds (x, topMargin, 88, controlHeight);
+    showMsButton.setBounds (x, topMargin, 85, controlHeight);
 
-    clearButton.setBounds (getWidth() - 90, topMargin, 82, controlHeight);
+    clearButton.setBounds (getWidth() - 85, topMargin, 78, controlHeight);
 
     gridComponent.setBounds (0, headerHeight, getWidth(), getHeight() - headerHeight);
 }

@@ -27,6 +27,7 @@ private:
     juce::ComboBox barsComboBox;
     juce::ComboBox subdivisionComboBox;
     juce::Slider toleranceSlider;
+    juce::Slider latencySlider;
     juce::Slider velocitySlider;
     juce::Slider bpmSlider;
     juce::ComboBox timeSigComboBox;
@@ -43,6 +44,7 @@ private:
     juce::Label barsLabel{ {}, "Bars:" };
     juce::Label subdivisionLabel{ {}, "Subdiv:" };
     juce::Label toleranceLabel{ {}, "Tolerance:" };
+    juce::Label latencyLabel{ {}, "Latency:" };
     juce::Label velocityLabel{ {}, "Min Vel:" };
     juce::Label bpmLabel{ {}, "BPM:" };
     juce::Label timeSigLabel{ {}, "Time Sig:" };
@@ -58,6 +60,7 @@ private:
     std::unique_ptr<ComboBoxAttachment> barsAttachment;
     std::unique_ptr<ComboBoxAttachment> subdivisionAttachment;
     std::unique_ptr<SliderAttachment> toleranceAttachment;
+    std::unique_ptr<SliderAttachment> latencyAttachment;
     std::unique_ptr<SliderAttachment> velocityAttachment;
     std::unique_ptr<SliderAttachment> bpmAttachment;
 

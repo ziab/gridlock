@@ -116,6 +116,7 @@ struct HitEvent {
 | `bars_window` | History Length | Choice | 1 Bar, 2 Bars, 4 Bars, 8 Bars | 4 Bars |
 | `subdivision` | Grid Subdivision | Choice | 1/8, 1/8T, 1/16, 1/16T, 1/32 | 1/16 |
 | `tolerance_ms`| Timing Tolerance | Float | 2.0 ms to 30.0 ms | 10.0 ms |
+| `latency_offset_ms`| Latency Compensation | Float | -100.0 ms to 100.0 ms | 0.0 ms |
 | `min_velocity`| Velocity Noise Floor | Int | 1 to 127 | 5 |
 | `internal_bpm`| Metronome BPM | Float | 40.0 to 300.0 BPM | 120.0 BPM |
 | `time_sig_num`| Time Sig Numerator | Int | 2 to 12 | 4 |

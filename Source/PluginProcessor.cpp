@@ -44,6 +44,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
         10.0f
     ));
 
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ "latency_offset_ms", 1 },
+        "System Latency Offset",
+        juce::NormalisableRange<float>(-100.0f, 100.0f, 1.0f),
+        0.0f
+    ));
+
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         juce::ParameterID{ "min_velocity", 1 },
         "Velocity Noise Floor",
@@ -162,6 +169,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
     // Read parameter values safely
     const int subChoice = static_cast<int>(apvts.getRawParameterValue("subdivision")->load());
     const float toleranceMs = apvts.getRawParameterValue("tolerance_ms")->load();
+    const float latencyOffsetMs = apvts.getRawParameterValue("latency_offset_ms")->load();
     const int minVelocity = static_cast<int>(apvts.getRawParameterValue("min_velocity")->load());
     const float internalBpmVal = apvts.getRawParameterValue("internal_bpm")->load();
     const int timeSigNumVal = static_cast<int>(apvts.getRawParameterValue("time_sig_num")->load());
@@ -239,7 +247,10 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
 
             const double nearestGridPpq = std::round(hitPpq / gridInterval) * gridInterval;
             const double deltaPpq = hitPpq - nearestGridPpq;
-            const double deltaMs = (deltaPpq / (currentBpm / 60.0)) * 1000.0;
+            const double rawDeltaMs = (deltaPpq / (currentBpm / 60.0)) * 1000.0;
+
+            // System Latency Compensation Offset
+            const double deltaMs = rawDeltaMs - static_cast<double>(latencyOffsetMs);
 
             const float normalizedDev = std::clamp(static_cast<float>(deltaMs / static_cast<double>(toleranceMs)), -1.0f, 1.0f);
 
