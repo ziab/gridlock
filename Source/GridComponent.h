@@ -16,6 +16,8 @@ public:
     void updateEvents(const std::vector<HitEvent>& events, double currentPpq, int numBars, double gridSubdivisionPpq);
     void clearEvents();
 
+    static juce::Colour getContinuousHitColor(float normalizedDeviation) noexcept;
+
 private:
     struct DrumLaneInfo {
         juce::String label;

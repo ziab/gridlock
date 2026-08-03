@@ -5,8 +5,8 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     : AudioProcessorEditor (&p), processorRef (p)
 {
     setResizable (true, true);
-    setResizeLimits (800, 400, 1920, 1080);
-    setSize (960, 540);
+    setResizeLimits (880, 440, 1920, 1080);
+    setSize (1100, 580);
 
     addAndMakeVisible (gridComponent);
 
@@ -14,35 +14,61 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     barsComboBox.addItemList ({ "1 Bar", "2 Bars", "4 Bars", "8 Bars" }, 1);
     addAndMakeVisible (barsComboBox);
     barsLabel.attachToComponent (&barsComboBox, false);
-    barsLabel.setFont (juce::Font (12.0f, juce::Font::bold));
+    barsLabel.setFont (juce::Font (11.0f, juce::Font::bold));
     barsLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
 
     subdivisionComboBox.addItemList ({ "1/8", "1/8T", "1/16", "1/16T", "1/32" }, 1);
     addAndMakeVisible (subdivisionComboBox);
     subdivisionLabel.attachToComponent (&subdivisionComboBox, false);
-    subdivisionLabel.setFont (juce::Font (12.0f, juce::Font::bold));
+    subdivisionLabel.setFont (juce::Font (11.0f, juce::Font::bold));
     subdivisionLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
 
     toleranceSlider.setSliderStyle (juce::Slider::LinearBar);
-    toleranceSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 50, 20);
+    toleranceSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 45, 20);
     addAndMakeVisible (toleranceSlider);
     toleranceLabel.attachToComponent (&toleranceSlider, false);
-    toleranceLabel.setFont (juce::Font (12.0f, juce::Font::bold));
+    toleranceLabel.setFont (juce::Font (11.0f, juce::Font::bold));
     toleranceLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
 
     velocitySlider.setSliderStyle (juce::Slider::LinearBar);
-    velocitySlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 40, 20);
+    velocitySlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 35, 20);
     addAndMakeVisible (velocitySlider);
     velocityLabel.attachToComponent (&velocitySlider, false);
-    velocityLabel.setFont (juce::Font (12.0f, juce::Font::bold));
+    velocityLabel.setFont (juce::Font (11.0f, juce::Font::bold));
     velocityLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
 
     bpmSlider.setSliderStyle (juce::Slider::LinearBar);
-    bpmSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 50, 20);
+    bpmSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 45, 20);
     addAndMakeVisible (bpmSlider);
     bpmLabel.attachToComponent (&bpmSlider, false);
-    bpmLabel.setFont (juce::Font (12.0f, juce::Font::bold));
+    bpmLabel.setFont (juce::Font (11.0f, juce::Font::bold));
     bpmLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
+
+    timeSigComboBox.addItemList ({ "2/4", "3/4", "4/4", "5/4", "6/8", "7/8" }, 1);
+    addAndMakeVisible (timeSigComboBox);
+    timeSigLabel.attachToComponent (&timeSigComboBox, false);
+    timeSigLabel.setFont (juce::Font (11.0f, juce::Font::bold));
+    timeSigLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
+
+    clickSubComboBox.addItemList ({ "Off", "1/4 Notes", "1/8 Notes", "1/16 Notes", "Triplets" }, 1);
+    addAndMakeVisible (clickSubComboBox);
+    clickSubLabel.attachToComponent (&clickSubComboBox, false);
+    clickSubLabel.setFont (juce::Font (11.0f, juce::Font::bold));
+    clickSubLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
+
+    clickVolumeSlider.setSliderStyle (juce::Slider::LinearBar);
+    clickVolumeSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 35, 20);
+    addAndMakeVisible (clickVolumeSlider);
+    clickVolLabel.attachToComponent (&clickVolumeSlider, false);
+    clickVolLabel.setFont (juce::Font (11.0f, juce::Font::bold));
+    clickVolLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
+
+    clickToggleButton.setClickingTogglesState (true);
+    clickToggleButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
+    clickToggleButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xff00c853));
+    clickToggleButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffffffff));
+    clickToggleButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xffffffff));
+    addAndMakeVisible (clickToggleButton);
 
     clearButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
     clearButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffffffff));
@@ -54,11 +80,45 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
 
     // Attach APVTS Parameters
     auto& apvts = processorRef.getAPVTS();
-    barsAttachment        = std::make_unique<ComboBoxAttachment>(apvts, "bars_window",  barsComboBox);
-    subdivisionAttachment = std::make_unique<ComboBoxAttachment>(apvts, "subdivision",  subdivisionComboBox);
-    toleranceAttachment   = std::make_unique<SliderAttachment>  (apvts, "tolerance_ms", toleranceSlider);
-    velocityAttachment    = std::make_unique<SliderAttachment>  (apvts, "min_velocity", velocitySlider);
-    bpmAttachment         = std::make_unique<SliderAttachment>  (apvts, "internal_bpm", bpmSlider);
+    barsAttachment        = std::make_unique<ComboBoxAttachment>(apvts, "bars_window",       barsComboBox);
+    subdivisionAttachment = std::make_unique<ComboBoxAttachment>(apvts, "subdivision",       subdivisionComboBox);
+    toleranceAttachment   = std::make_unique<SliderAttachment>  (apvts, "tolerance_ms",      toleranceSlider);
+    velocityAttachment    = std::make_unique<SliderAttachment>  (apvts, "min_velocity",      velocitySlider);
+    bpmAttachment         = std::make_unique<SliderAttachment>  (apvts, "internal_bpm",      bpmSlider);
+
+    clickSubAttachment    = std::make_unique<ComboBoxAttachment>(apvts, "click_subdivision", clickSubComboBox);
+    clickVolumeAttachment = std::make_unique<SliderAttachment>  (apvts, "click_volume",      clickVolumeSlider);
+    clickEnabledAttachment= std::make_unique<ButtonAttachment>  (apvts, "click_enabled",     clickToggleButton);
+
+    // Custom time signature combo box handler mapping to time_sig_num
+    timeSigComboBox.onChange = [this, &apvts]() {
+        const int idx = timeSigComboBox.getSelectedItemIndex();
+        int num = 4;
+        switch (idx) {
+            case 0: num = 2; break;
+            case 1: num = 3; break;
+            case 2: num = 4; break;
+            case 3: num = 5; break;
+            case 4: num = 6; break;
+            case 5: num = 7; break;
+            default: num = 4; break;
+        }
+        if (auto* param = apvts.getParameter("time_sig_num")) {
+            param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(num)));
+        }
+    };
+
+    // Set initial selection for time sig combo box
+    const int initialTimeSig = static_cast<int>(apvts.getRawParameterValue("time_sig_num")->load());
+    switch (initialTimeSig) {
+        case 2: timeSigComboBox.setSelectedItemIndex(0, juce::dontSendNotification); break;
+        case 3: timeSigComboBox.setSelectedItemIndex(1, juce::dontSendNotification); break;
+        case 4: timeSigComboBox.setSelectedItemIndex(2, juce::dontSendNotification); break;
+        case 5: timeSigComboBox.setSelectedItemIndex(3, juce::dontSendNotification); break;
+        case 6: timeSigComboBox.setSelectedItemIndex(4, juce::dontSendNotification); break;
+        case 7: timeSigComboBox.setSelectedItemIndex(5, juce::dontSendNotification); break;
+        default: timeSigComboBox.setSelectedItemIndex(2, juce::dontSendNotification); break;
+    }
 
     startTimerHz (60);
 }
@@ -90,7 +150,7 @@ void MidiGridAnalyzerAudioProcessorEditor::timerCallback()
     }
 
     const double windowPpq = static_cast<double>(barsVal) * 4.0;
-    const double minPpqThreshold = currentPpq - windowPpq - 8.0; // Keep slight margin before eviction
+    const double minPpqThreshold = currentPpq - windowPpq - 8.0;
 
     // Evict old events outside the rolling window
     eventHistory.erase (
@@ -113,37 +173,48 @@ void MidiGridAnalyzerAudioProcessorEditor::paint (juce::Graphics& g)
 
     // Header Background
     g.setColour (juce::Colour (0xff181b24));
-    g.fillRect (0, 0, getWidth(), 60);
+    g.fillRect (0, 0, getWidth(), 65);
 
     g.setColour (juce::Colour (0xff2d3245));
-    g.drawHorizontalLine (60, 0.0f, static_cast<float>(getWidth()));
+    g.drawHorizontalLine (65, 0.0f, static_cast<float>(getWidth()));
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::resized()
 {
-    const int margin = 8;
-    const int topMargin = 22;
+    const int margin = 6;
+    const int topMargin = 24;
     const int controlHeight = 26;
-    const int headerHeight = 65;
+    const int headerHeight = 68;
 
     int x = margin;
 
-    barsComboBox.setBounds (x, topMargin, 90, controlHeight);
-    x += 100;
+    barsComboBox.setBounds (x, topMargin, 78, controlHeight);
+    x += 84;
 
-    subdivisionComboBox.setBounds (x, topMargin, 90, controlHeight);
-    x += 100;
+    subdivisionComboBox.setBounds (x, topMargin, 78, controlHeight);
+    x += 84;
 
-    toleranceSlider.setBounds (x, topMargin, 110, controlHeight);
-    x += 120;
+    toleranceSlider.setBounds (x, topMargin, 95, controlHeight);
+    x += 101;
 
-    velocitySlider.setBounds (x, topMargin, 90, controlHeight);
-    x += 100;
+    velocitySlider.setBounds (x, topMargin, 75, controlHeight);
+    x += 81;
 
-    bpmSlider.setBounds (x, topMargin, 90, controlHeight);
-    x += 100;
+    bpmSlider.setBounds (x, topMargin, 85, controlHeight);
+    x += 91;
 
-    clearButton.setBounds (getWidth() - 110, topMargin, 95, controlHeight);
+    timeSigComboBox.setBounds (x, topMargin, 70, controlHeight);
+    x += 76;
+
+    clickSubComboBox.setBounds (x, topMargin, 95, controlHeight);
+    x += 101;
+
+    clickVolumeSlider.setBounds (x, topMargin, 75, controlHeight);
+    x += 81;
+
+    clickToggleButton.setBounds (x, topMargin, 80, controlHeight);
+
+    clearButton.setBounds (getWidth() - 95, topMargin, 85, controlHeight);
 
     gridComponent.setBounds (0, headerHeight, getWidth(), getHeight() - headerHeight);
 }

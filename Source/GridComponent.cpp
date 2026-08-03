@@ -1,5 +1,6 @@
 #include "GridComponent.h"
 #include <cmath>
+#include <algorithm>
 
 GridComponent::GridComponent()
 {
@@ -21,6 +22,50 @@ int GridComponent::getLaneIndexForNote(uint8_t note) const noexcept
     if (note == 48 || note == 45 || note == 43) return 3; // Toms
     if (note == 49 || note == 51 || note == 53) return 4; // Cymbals
     return 5; // Other
+}
+
+juce::Colour GridComponent::getContinuousHitColor(float normalizedDeviation) noexcept
+{
+    const float dev = std::clamp(normalizedDeviation, -1.0f, 1.0f);
+
+    if (dev < 0.0f)
+    {
+        const float t = std::abs(dev);
+        if (t <= 0.5f) {
+            const float k = t / 0.5f;
+            return juce::Colour::fromRGB(
+                static_cast<juce::uint8>(juce::jmap(k, 0.0f, 255.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 255.0f, 200.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 136.0f, 0.0f))
+            );
+        } else {
+            const float k = (t - 0.5f) / 0.5f;
+            return juce::Colour::fromRGB(
+                static_cast<juce::uint8>(juce::jmap(k, 255.0f, 255.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 200.0f, 23.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 0.0f, 68.0f))
+            );
+        }
+    }
+    else
+    {
+        const float t = dev;
+        if (t <= 0.5f) {
+            const float k = t / 0.5f;
+            return juce::Colour::fromRGB(
+                static_cast<juce::uint8>(juce::jmap(k, 0.0f, 0.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 255.0f, 229.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 136.0f, 255.0f))
+            );
+        } else {
+            const float k = (t - 0.5f) / 0.5f;
+            return juce::Colour::fromRGB(
+                static_cast<juce::uint8>(juce::jmap(k, 0.0f, 213.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 229.0f, 0.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 255.0f, 249.0f))
+            );
+        }
+    }
 }
 
 void GridComponent::updateEvents(const std::vector<HitEvent>& events, double currentPpq, int numBars, double gridSubdivisionPpq)
@@ -65,7 +110,6 @@ void GridComponent::paint(juce::Graphics& g)
         const float y = i * laneHeight;
         const auto laneRect = juce::Rectangle<float>(0.0f, y, boundsWidth, laneHeight);
 
-        // Alternating subtle background
         if (i % 2 == 0)
             g.setColour(juce::Colour(0xff161922));
         else
@@ -73,7 +117,7 @@ void GridComponent::paint(juce::Graphics& g)
 
         g.fillRect(laneRect);
 
-        // Horizontal Lane Separator Line
+        // Horizontal Lane Separator
         g.setColour(juce::Colour(0xff2d3245));
         g.drawHorizontalLine(static_cast<int>(y), 0.0f, boundsWidth);
 
@@ -93,7 +137,7 @@ void GridComponent::paint(juce::Graphics& g)
     }
 
     // Calculate PPQ Window
-    const double totalPpqWindow = static_cast<double>(barsWindow) * 4.0; // 4/4 time assumption
+    const double totalPpqWindow = static_cast<double>(barsWindow) * 4.0;
     const double maxPpq = currentPpqPos;
     const double minPpq = maxPpq - totalPpqWindow;
 
@@ -109,7 +153,6 @@ void GridComponent::paint(juce::Graphics& g)
             const float normalizedX = static_cast<float>((tick - minPpq) / totalPpqWindow);
             const float x = canvasLeft + (normalizedX * canvasWidth);
 
-            // Determine if tick is a Bar Line (every 4.0 PPQ)
             const double barCheck = std::abs(std::fmod(tick, 4.0));
             const bool isBarLine = (barCheck < 0.001 || barCheck > 3.999);
 
@@ -126,8 +169,8 @@ void GridComponent::paint(juce::Graphics& g)
         }
     }
 
-    // Render Hit Events
-    const float nodeRadius = 11.0f; // Large, high-visibility hit nodes for 4-6 ft viewing
+    // Render Hit Events with Continuous Dynamic Color Gradient
+    const float nodeRadius = 11.0f; // High visibility hit nodes
 
     for (const auto& event : activeEvents)
     {
@@ -141,31 +184,20 @@ void GridComponent::paint(juce::Graphics& g)
         const float hitX = canvasLeft + (normalizedX * canvasWidth);
         const float hitY = (laneIndex * laneHeight) + (laneHeight * 0.5f);
 
-        // Pick High-Contrast Timing Color
-        juce::Colour fillColour;
-        switch (event.state)
-        {
-            case TimingState::OnGrid:
-                fillColour = juce::Colour(0xff00e676); // Bright Emerald Green
-                break;
-            case TimingState::Rush:
-                fillColour = juce::Colour(0xffff1744); // Vivid Coral Red
-                break;
-            case TimingState::Drag:
-                fillColour = juce::Colour(0xffd500f9); // Neon Magenta / Purple
-                break;
-        }
+        // Continuous Dynamic Color Interpolation
+        const juce::Colour fillColour = getContinuousHitColor(event.normalizedDeviation);
 
-        // Draw Outer Contrast Ring & Filled Circle
         const auto hitRect = juce::Rectangle<float>(hitX - nodeRadius, hitY - nodeRadius, nodeRadius * 2.0f, nodeRadius * 2.0f);
 
+        // Outer contrast ring
         g.setColour(juce::Colour(0xff0a0c10));
         g.fillEllipse(hitRect.expanded(2.0f));
 
+        // Filled color node
         g.setColour(fillColour);
         g.fillEllipse(hitRect);
 
-        // Draw Delta ms text inside node if large enough
+        // Draw Delta ms text inside node
         g.setColour(juce::Colour(0xff000000));
         g.setFont(juce::Font(10.0f, juce::Font::bold));
         juce::String deltaText = juce::String(static_cast<int>(std::round(event.deltaMs)));

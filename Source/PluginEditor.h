@@ -22,27 +22,42 @@ private:
 
     GridComponent gridComponent;
 
+    // Controls
     juce::ComboBox barsComboBox;
     juce::ComboBox subdivisionComboBox;
     juce::Slider toleranceSlider;
     juce::Slider velocitySlider;
     juce::Slider bpmSlider;
+    juce::ComboBox timeSigComboBox;
+    juce::ComboBox clickSubComboBox;
+    juce::Slider clickVolumeSlider;
+    juce::TextButton clickToggleButton{ "CLICK ON" };
     juce::TextButton clearButton{ "Clear Grid" };
 
+    // Labels
     juce::Label barsLabel{ {}, "Bars:" };
     juce::Label subdivisionLabel{ {}, "Subdiv:" };
-    juce::Label toleranceLabel{ {}, "Tolerance (ms):" };
+    juce::Label toleranceLabel{ {}, "Tolerance:" };
     juce::Label velocityLabel{ {}, "Min Vel:" };
     juce::Label bpmLabel{ {}, "BPM:" };
+    juce::Label timeSigLabel{ {}, "Time Sig:" };
+    juce::Label clickSubLabel{ {}, "Click Sub:" };
+    juce::Label clickVolLabel{ {}, "Click Vol:" };
 
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
-    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
+    using SliderAttachment   = juce::AudioProcessorValueTreeState::SliderAttachment;
+    using ButtonAttachment   = juce::AudioProcessorValueTreeState::ButtonAttachment;
 
     std::unique_ptr<ComboBoxAttachment> barsAttachment;
     std::unique_ptr<ComboBoxAttachment> subdivisionAttachment;
     std::unique_ptr<SliderAttachment> toleranceAttachment;
     std::unique_ptr<SliderAttachment> velocityAttachment;
     std::unique_ptr<SliderAttachment> bpmAttachment;
+
+    std::unique_ptr<ComboBoxAttachment> timeSigAttachment;
+    std::unique_ptr<ComboBoxAttachment> clickSubAttachment;
+    std::unique_ptr<SliderAttachment> clickVolumeAttachment;
+    std::unique_ptr<ButtonAttachment> clickEnabledAttachment;
 
     std::vector<HitEvent> eventHistory;
 

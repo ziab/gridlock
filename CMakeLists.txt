@@ -21,7 +21,7 @@ juce_add_plugin(MidiGridAnalyzer
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
-    IS_MIDI_EFFECT TRUE
+    IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     COPY_PLUGIN_AFTER_BUILD FALSE
     PLUGIN_MANUFACTURER_CODE Grdl
@@ -34,6 +34,8 @@ juce_add_plugin(MidiGridAnalyzer
 target_sources(MidiGridAnalyzer PRIVATE
     Source/HitEvent.h
     Source/RingBuffer.h
+    Source/ClickGenerator.h
+    Source/ClickGenerator.cpp
     Source/PluginProcessor.h
     Source/PluginProcessor.cpp
     Source/GridComponent.h
