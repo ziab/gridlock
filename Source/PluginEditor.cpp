@@ -11,9 +11,9 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     if (auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
     {
         const auto area = display->userArea;
-        const int minW = std::min(840, area.getWidth() / 2);
-        const int minH = std::min(450, area.getHeight() / 2);
-        const int defaultW = std::min(1320, static_cast<int>(area.getWidth() * 0.8));
+        const int minW = std::min(960, area.getWidth() / 2);
+        const int minH = std::min(480, area.getHeight() / 2);
+        const int defaultW = std::min(1380, static_cast<int>(area.getWidth() * 0.82));
         const int defaultH = std::min(680, static_cast<int>(area.getHeight() * 0.8));
 
         setResizeLimits (minW, minH, area.getWidth(), area.getHeight());
@@ -21,8 +21,8 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     }
     else
     {
-        setResizeLimits (840, 450, 1920, 1080);
-        setSize (1240, 600);
+        setResizeLimits (960, 480, 1920, 1080);
+        setSize (1380, 640);
     }
 
     addAndMakeVisible (gridComponent);
@@ -100,6 +100,23 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     clickToggleButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xffffffff));
     addAndMakeVisible (clickToggleButton);
 
+    pauseButton.setClickingTogglesState (true);
+    pauseButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
+    pauseButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffeab308)); // Amber Paused
+    pauseButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffffffff));
+    pauseButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xff000000));
+    addAndMakeVisible (pauseButton);
+    pauseButton.onStateChange = [this]() {
+        pauseButton.setButtonText (pauseButton.getToggleState() ? "RESUME" : "PAUSE");
+    };
+
+    showMsButton.setClickingTogglesState (true);
+    showMsButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
+    showMsButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xff0284c7)); // Sky Blue MS
+    showMsButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xff818cf8));
+    showMsButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xffffffff));
+    addAndMakeVisible (showMsButton);
+
     clearButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
     clearButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffffffff));
     addAndMakeVisible (clearButton);
@@ -121,6 +138,8 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     clickVolumeAttachment = std::make_unique<SliderAttachment>  (apvts, "click_volume",        clickVolumeSlider);
     clickPanAttachment    = std::make_unique<SliderAttachment>  (apvts, "click_pan",           clickPanSlider);
     clickEnabledAttachment= std::make_unique<ButtonAttachment>  (apvts, "click_enabled",       clickToggleButton);
+    pauseAttachment       = std::make_unique<ButtonAttachment>  (apvts, "is_paused",           pauseButton);
+    showMsAttachment      = std::make_unique<ButtonAttachment>  (apvts, "show_ms_labels",      showMsButton);
 
     // Custom time signature combo box handler mapping to time_sig_num
     timeSigComboBox.onChange = [this, &apvts]() {
@@ -213,7 +232,9 @@ void MidiGridAnalyzerAudioProcessorEditor::timerCallback()
     const int subIdx = subdivisionComboBox.getSelectedItemIndex();
     const double subdivisionPpq = MidiGridAnalyzerAudioProcessor::getSubdivisionPpq (subIdx);
     const int timeSigNum = processorRef.getCurrentTimeSigNum();
-    gridComponent.updateEvents (eventHistory, currentPpq, barsVal, subdivisionPpq, timeSigNum);
+    const bool showMsVal = (processorRef.getAPVTS().getRawParameterValue("show_ms_labels")->load() > 0.5f);
+
+    gridComponent.updateEvents (eventHistory, currentPpq, barsVal, subdivisionPpq, timeSigNum, showMsVal);
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::paint (juce::Graphics& g)
@@ -268,8 +289,14 @@ void MidiGridAnalyzerAudioProcessorEditor::resized()
     x += 74;
 
     clickToggleButton.setBounds (x, topMargin, 75, controlHeight);
+    x += 79;
 
-    clearButton.setBounds (getWidth() - 95, topMargin, 88, controlHeight);
+    pauseButton.setBounds (x, topMargin, 70, controlHeight);
+    x += 74;
+
+    showMsButton.setBounds (x, topMargin, 88, controlHeight);
+
+    clearButton.setBounds (getWidth() - 90, topMargin, 82, controlHeight);
 
     gridComponent.setBounds (0, headerHeight, getWidth(), getHeight() - headerHeight);
 }

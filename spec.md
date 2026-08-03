@@ -124,6 +124,8 @@ struct HitEvent {
 | `click_volume`| Click Volume | Float | 0.0 to 1.0 (Linear gain) | 0.8 |
 | `click_pan`   | Click Panning | Float | -1.0 (L) to +1.0 (R) | 0.0 |
 | `click_enabled`| Metronome On/Off | Bool | Toggle | True |
+| `is_paused`   | Pause/Freeze Grid| Bool | Toggle | False |
+| `show_ms_labels`| Display MS Offsets| Bool| Toggle | True |
 | `note_filter`  | Display Mode | Choice | All Notes, Roland/GM Drum Map, Custom | Roland/GM Drum Map |
 
 ---

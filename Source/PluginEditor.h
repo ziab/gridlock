@@ -35,6 +35,8 @@ private:
     juce::Slider clickVolumeSlider;
     juce::Slider clickPanSlider;
     juce::TextButton clickToggleButton{ "CLICK ON" };
+    juce::TextButton pauseButton{ "PAUSE" };
+    juce::TextButton showMsButton{ "MS OFFSETS" };
     juce::TextButton clearButton{ "Clear Grid" };
 
     // Labels
@@ -65,6 +67,8 @@ private:
     std::unique_ptr<SliderAttachment> clickVolumeAttachment;
     std::unique_ptr<SliderAttachment> clickPanAttachment;
     std::unique_ptr<ButtonAttachment> clickEnabledAttachment;
+    std::unique_ptr<ButtonAttachment> pauseAttachment;
+    std::unique_ptr<ButtonAttachment> showMsAttachment;
 
     std::vector<HitEvent> eventHistory;
 

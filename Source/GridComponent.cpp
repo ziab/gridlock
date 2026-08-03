@@ -68,13 +68,19 @@ juce::Colour GridComponent::getContinuousHitColor(float normalizedDeviation) noe
     }
 }
 
-void GridComponent::updateEvents(const std::vector<HitEvent>& events, double currentPpq, int numBars, double gridSubdivisionPpq, int timeSigNum)
+void GridComponent::updateEvents(const std::vector<HitEvent>& events,
+                                 double currentPpq,
+                                 int numBars,
+                                 double gridSubdivisionPpq,
+                                 int timeSigNum,
+                                 bool showMsLabels)
 {
     activeEvents = events;
     currentPpqPos = currentPpq;
     barsWindow = (numBars > 0) ? numBars : 4;
     subdivisionPpq = (gridSubdivisionPpq > 0.0) ? gridSubdivisionPpq : 0.25;
     timeSigNumerator = (timeSigNum > 0) ? timeSigNum : 4;
+    displayMsLabels = showMsLabels;
     repaint();
 }
 
@@ -123,7 +129,7 @@ void GridComponent::paint(juce::Graphics& g)
     g.drawText("GRID RULER", juce::Rectangle<float>(12.0f, 0.0f, labelWidth - 16.0f, rulerHeight),
                juce::Justification::centredLeft, true);
 
-    // Draw Drum Lane Backgrounds & Sidebar Labels (Ordered: Cymbals, Hi-Hat, Kick, Snare, Toms, Other)
+    // Draw Drum Lane Backgrounds & Sidebar Labels
     for (int i = 0; i < numLanes; ++i)
     {
         const float y = laneAreaTop + (i * laneHeight);
@@ -241,12 +247,29 @@ void GridComponent::paint(juce::Graphics& g)
         g.setColour(fillColour);
         g.fillEllipse(hitRect);
 
-        // Draw Delta ms text inside node
+        // Draw Velocity inside node
         g.setColour(juce::Colour(0xff000000));
         g.setFont(juce::Font(10.0f, juce::Font::bold));
-        juce::String deltaText = juce::String(static_cast<int>(std::round(event.deltaMs)));
-        if (event.deltaMs > 0) deltaText = "+" + deltaText;
-        g.drawText(deltaText, hitRect, juce::Justification::centred, false);
+        g.drawText(juce::String(event.velocity), hitRect, juce::Justification::centred, false);
+
+        // Display MS Offset Label underneath note if enabled
+        if (displayMsLabels)
+        {
+            juce::String msText = juce::String(static_cast<int>(std::round(event.deltaMs))) + "ms";
+            if (event.deltaMs > 0) msText = "+" + msText;
+
+            const float labelW = 44.0f;
+            const float labelH = 14.0f;
+            const auto labelRect = juce::Rectangle<float>(hitX - (labelW * 0.5f), hitY + nodeRadius + 2.0f, labelW, labelH);
+
+            // Dark background pill for throne-distance contrast
+            g.setColour(juce::Colour(0xd00a0c10));
+            g.fillRoundedRectangle(labelRect, 3.0f);
+
+            g.setColour(fillColour);
+            g.setFont(juce::Font(10.0f, juce::Font::bold));
+            g.drawText(msText, labelRect, juce::Justification::centred, false);
+        }
     }
 
     // Draw Current Playhead Line (Bright Cyan Vertical Bar)

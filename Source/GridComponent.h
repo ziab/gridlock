@@ -13,7 +13,12 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
-    void updateEvents(const std::vector<HitEvent>& events, double currentPpq, int numBars, double gridSubdivisionPpq, int timeSigNum = 4);
+    void updateEvents(const std::vector<HitEvent>& events,
+                      double currentPpq,
+                      int numBars,
+                      double gridSubdivisionPpq,
+                      int timeSigNum = 4,
+                      bool showMsLabels = true);
     void clearEvents();
 
     static juce::Colour getContinuousHitColor(float normalizedDeviation) noexcept;
@@ -29,6 +34,7 @@ private:
     int barsWindow{ 4 };
     double subdivisionPpq{ 0.25 };
     int timeSigNumerator{ 4 };
+    bool displayMsLabels{ true };
 
     std::vector<DrumLaneInfo> drumLanes;
     int getLaneIndexForNote(uint8_t note) const noexcept;

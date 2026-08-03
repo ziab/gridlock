@@ -97,6 +97,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
         true
     ));
 
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ "is_paused", 1 },
+        "Pause/Freeze Grid",
+        false
+    ));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ "show_ms_labels", 1 },
+        "Display MS Offsets",
+        true
+    ));
+
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{ "note_filter", 1 },
         "Display Mode",
@@ -158,6 +170,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
     const float clickVolVal = apvts.getRawParameterValue("click_volume")->load();
     const float clickPanVal = apvts.getRawParameterValue("click_pan")->load();
     const bool clickEnabledVal = (apvts.getRawParameterValue("click_enabled")->load() > 0.5f);
+    const bool isPausedVal = (apvts.getRawParameterValue("is_paused")->load() > 0.5f);
 
     const double gridInterval = getSubdivisionPpq(subChoice);
 
@@ -193,13 +206,13 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
     currentBpm = (hostBpm > 0.0) ? hostBpm : internalBpmVal;
     currentPpqPosition = hostPpqValid ? hostPpq : internalPpqPosition;
     currentTimeSigNum = (hostTimeSigNum > 0) ? hostTimeSigNum : timeSigNumVal;
-    hostIsPlaying = hostPlaying || !hostPpqValid; // In standalone / fallback, treat as active
+    hostIsPlaying = (hostPlaying || !hostPpqValid) && !isPausedVal;
 
     const double srToUse = (sampleRate > 0.0) ? sampleRate : 44100.0;
     const double blockStartPpq = currentPpqPosition;
 
-    // Render Audio Click ONLY in Standalone mode
-    if (isStandaloneMode)
+    // Render Audio Click ONLY in Standalone mode when NOT paused
+    if (isStandaloneMode && !isPausedVal)
     {
         clickGenerator.renderBlock(buffer,
                                    numSamples,
@@ -214,7 +227,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
                                    clickEnabledVal);
     }
 
-    // Process incoming MIDI events
+    // Process incoming MIDI events (MIDI pass-through active regardless of pause)
     for (const auto metadata : midiMessages)
     {
         const auto msg = metadata.getMessage();
@@ -251,8 +264,11 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
         }
     }
 
-    // Advance internal clock position
-    internalPpqPosition += numSamples * (currentBpm / 60.0) / srToUse;
+    // Advance internal clock position ONLY when not paused
+    if (!isPausedVal)
+    {
+        internalPpqPosition += numSamples * (currentBpm / 60.0) / srToUse;
+    }
 }
 
 juce::AudioProcessorEditor* MidiGridAnalyzerAudioProcessor::createEditor()
