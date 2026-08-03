@@ -137,12 +137,12 @@ struct HitEvent {
 
 ### 4.4 GUI Component & Continuous Color Mapping (`GridComponent.h` / `.cpp`)
 
-* **Tolerance & Falloff Color Gradient Algorithm**:
+* **Instant Tolerance Boundary & Color Falloff Algorithm**:
   - `MaxErrorMs` $= (\text{subdivisionPpq} / 2.0) \times (60.0 / \text{BPM}) \times 1000.0$.
   - **Within Tolerance ($|\Delta\text{ms}| \le \text{Tolerance}$):** Pure Emerald Green (`#00FF88`).
   - **Beyond Tolerance ($|\Delta\text{ms}| > \text{Tolerance}$):** Falloff ratio $t = \text{clamp}\left(\frac{|\Delta\text{ms}| - \text{Tolerance}}{\text{MaxErrorMs} - \text{Tolerance}}, 0.0, 1.0\right)$.
-    - **Rush ($\Delta\text{ms} < 0$):** Smooth transition Green $\rightarrow$ Yellow $\rightarrow$ Orange $\rightarrow$ Electric Red (`#FF1744`) as $t \rightarrow 1.0$.
-    - **Drag ($\Delta\text{ms} > 0$):** Smooth transition Green $\rightarrow$ Cyan $\rightarrow$ Blue/Violet $\rightarrow$ Vivid Purple (`#D500F9`) as $t \rightarrow 1.0$.
+    - **Rush ($\Delta\text{ms} < 0$):** Instantly turns **Yellow (`#FFEA00`)** at $t=0.0$ $\rightarrow$ Orange (`#FF9100`) $\rightarrow$ Electric Red (`#FF1744`) as $t \rightarrow 1.0$.
+    - **Drag ($\Delta\text{ms} > 0$):** Instantly turns **Cyan (`#00E5FF`)** at $t=0.0$ $\rightarrow$ Deep Blue (`#2979FF`) $\rightarrow$ Vivid Purple (`#D500F9`) as $t \rightarrow 1.0$.
 
 ---
 

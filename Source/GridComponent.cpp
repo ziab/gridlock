@@ -34,42 +34,42 @@ juce::Colour GridComponent::getContinuousHitColor(float deltaMs, float tolerance
         return juce::Colour(0xff00ff88); // Pure Emerald Green
     }
 
-    // Beyond tolerance: Fall off to Red (Rush) or Purple (Drag) up to maxErrorMs (half grid subdivision)
+    // Beyond tolerance: Instantly pops to Yellow (Rush) or Cyan (Drag) and deepens to Red/Purple
     const float denom = std::max(0.001f, maxErrorMs - toleranceMs);
     const float t = std::clamp((absDelta - toleranceMs) / denom, 0.0f, 1.0f);
 
-    if (deltaMs < 0.0f) // Rush / Early -> Green -> Yellow -> Orange -> Electric Red
+    if (deltaMs < 0.0f) // Rush / Early -> Yellow (#FFEA00) -> Orange (#FF9100) -> Electric Red (#FF1744)
     {
         if (t <= 0.5f) {
             const float k = t / 0.5f;
             return juce::Colour::fromRGB(
-                static_cast<juce::uint8>(juce::jmap(k, 0.0f, 255.0f)),
-                static_cast<juce::uint8>(juce::jmap(k, 255.0f, 200.0f)),
-                static_cast<juce::uint8>(juce::jmap(k, 136.0f, 0.0f))
+                255,
+                static_cast<juce::uint8>(juce::jmap(k, 234.0f, 145.0f)),
+                0
             );
         } else {
             const float k = (t - 0.5f) / 0.5f;
             return juce::Colour::fromRGB(
-                static_cast<juce::uint8>(juce::jmap(k, 255.0f, 255.0f)),
-                static_cast<juce::uint8>(juce::jmap(k, 200.0f, 23.0f)),
+                255,
+                static_cast<juce::uint8>(juce::jmap(k, 145.0f, 23.0f)),
                 static_cast<juce::uint8>(juce::jmap(k, 0.0f, 68.0f))
             );
         }
     }
-    else // Drag / Late -> Green -> Cyan -> Blue/Violet -> Vivid Purple
+    else // Drag / Late -> Cyan (#00E5FF) -> Deep Blue (#2979FF) -> Vivid Purple (#D500F9)
     {
         if (t <= 0.5f) {
             const float k = t / 0.5f;
             return juce::Colour::fromRGB(
-                static_cast<juce::uint8>(juce::jmap(k, 0.0f, 0.0f)),
-                static_cast<juce::uint8>(juce::jmap(k, 255.0f, 229.0f)),
-                static_cast<juce::uint8>(juce::jmap(k, 136.0f, 255.0f))
+                static_cast<juce::uint8>(juce::jmap(k, 0.0f, 41.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 229.0f, 121.0f)),
+                255
             );
         } else {
             const float k = (t - 0.5f) / 0.5f;
             return juce::Colour::fromRGB(
-                static_cast<juce::uint8>(juce::jmap(k, 0.0f, 213.0f)),
-                static_cast<juce::uint8>(juce::jmap(k, 229.0f, 0.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 41.0f, 213.0f)),
+                static_cast<juce::uint8>(juce::jmap(k, 121.0f, 0.0f)),
                 static_cast<juce::uint8>(juce::jmap(k, 255.0f, 249.0f))
             );
         }
@@ -258,7 +258,7 @@ void GridComponent::paint(juce::Graphics& g)
         const float hitX = canvasLeft + (normalizedX * canvasWidth);
         const float hitY = laneAreaTop + (laneIndex * laneHeight) + (laneHeight * 0.5f);
 
-        // Continuous Dynamic Color Interpolation: 100% Emerald Green within tolerance, falloff to Red/Purple up to maxErrorMs
+        // Instant Yellow/Cyan transition at tolerance boundary, deepening into Red/Purple at maxErrorMs
         const juce::Colour fillColour = getContinuousHitColor(static_cast<float>(liveDeltaMs), toleranceMsVal, maxErrorMs);
 
         const auto hitRect = juce::Rectangle<float>(hitX - nodeRadius, hitY - nodeRadius, nodeRadius * 2.0f, nodeRadius * 2.0f);
