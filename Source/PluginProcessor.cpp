@@ -326,10 +326,11 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
 
                 auto pushTestHit = [this, tick, totalLatencyPpq, gridInterval, toleranceMs](uint8_t note, uint8_t vel, double devMs) {
                     const double devPpq = (devMs / 1000.0) * (currentBpm / 60.0);
-                    const double rawPpq = tick + devPpq;
+                    const double targetCompPpq = tick + devPpq;
+                    const double rawPpq = targetCompPpq + totalLatencyPpq;
 
-                    const double nearestGrid = std::round(rawPpq / gridInterval) * gridInterval;
-                    const double deltaPpq = rawPpq - nearestGrid;
+                    const double nearestGrid = std::round(targetCompPpq / gridInterval) * gridInterval;
+                    const double deltaPpq = targetCompPpq - nearestGrid;
                     const double deltaMs = (deltaPpq / (currentBpm / 60.0)) * 1000.0;
                     const float normDev = std::clamp(static_cast<float>(deltaMs / static_cast<double>(toleranceMs)), -1.0f, 1.0f);
 
@@ -337,7 +338,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
                     e.noteNumber = note;
                     e.velocity = vel;
                     e.rawHitPpqPosition = rawPpq;
-                    e.hitPpqPosition = rawPpq - totalLatencyPpq;
+                    e.hitPpqPosition = targetCompPpq;
                     e.deltaMs = deltaMs;
                     e.normalizedDeviation = normDev;
                     e.state = (std::abs(deltaMs) <= toleranceMs) ? TimingState::OnGrid : ((deltaMs < 0) ? TimingState::Rush : TimingState::Drag);

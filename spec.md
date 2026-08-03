@@ -137,6 +137,14 @@ struct HitEvent {
 
 ---
 
+### 4.4 Test Mode Latency Compensation Rules
+* **Synthesized Test Hits**:
+  - Target Compensated Position: `compPpq = tick + devPpq`.
+  - Stored Raw Position: `rawHitPpqPosition = compPpq + totalLatencyPpq`.
+  - Ensures live GUI latency compensation rendering cancels out `totalLatencyPpq` perfectly, rendering test hits at their exact intended timing error (0ms kick, +14ms snare, etc.) regardless of slider latency adjustments.
+
+---
+
 ### 4.4 GUI Component & Continuous Color Mapping (`GridComponent.h` / `.cpp`)
 
 * **Instant Tolerance Boundary, Checkmark & Color Falloff Algorithm**:
