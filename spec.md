@@ -9,12 +9,16 @@ A real-time MIDI analyzer and drum practice application available as a Standalon
 
 ### 1.2 Core Workflow Requirements
 1. **Throne-Distance Visual Feedback:** Highly readable UI from 4–6 feet away with high-contrast elements, bold typography, clean drum lane separation, and smooth continuous color gradients for hits.
-2. **Roland / General MIDI Drum Map Defaults:** Vertical lanes map automatically to standard e-kit MIDI note layouts:
-   * **Kick:** Note `36`
-   * **Snare Head / Rim:** Notes `38` / `40`
-   * **Hi-Hat (Closed / Open / Pedal):** Notes `42` / `46` / `44`
-   * **Toms (Rack 1, 2, Floor):** Notes `48`, `45`, `43`
-   * **Cymbals (Crash / Ride / Ride Bell):** Notes `49`, `51`, `53`
+2. **Roland / General MIDI Drum Map Defaults:** **Main Canvas (Grid Display):**
+  * **Y-Axis (Top to Bottom):** Vertical drum lanes ordered as:
+    1. **Cymbals:** Crash (`49`), Ride (`51`), Ride Bell (`53`)
+    2. **Hi-Hat:** Closed (`42`), Open (`46`), Pedal (`44`)
+    3. **Kick:** Note (`36`)
+    4. **Snare:** Head (`38`) & Rim (`40`)
+    5. **Toms:** Rack 1 (`48`), Rack 2 (`45`), Floor (`43`)
+    6. **Other:** Unmapped MIDI notes
+  * **X-Axis:** Rolling PPQ window representing X bars, with top timeline ruler and explicit visual markers for Bar boundaries (Bar 1, Bar 2) and Strong Beats (1, 2, 3, 4).
+  * **Playhead:** Vertical line tracking PPQ position (Host or Internal Clock).
 3. **Sensitivity & Crosstalk Noise Floor:** Ignore velocity values below customizable noise floor (`min_velocity`, e.g. Velocity < 5) to prevent false triggers.
 4. **Built-in Sample-Based Metronome Click Engine (Standalone Mode Only):**
    * Active **exclusively in Standalone Application mode** (bypassed when running as a VST3/AU plugin in a DAW, where host DAW click is used).

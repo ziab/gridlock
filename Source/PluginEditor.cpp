@@ -212,8 +212,8 @@ void MidiGridAnalyzerAudioProcessorEditor::timerCallback()
 
     const int subIdx = subdivisionComboBox.getSelectedItemIndex();
     const double subdivisionPpq = MidiGridAnalyzerAudioProcessor::getSubdivisionPpq (subIdx);
-
-    gridComponent.updateEvents (eventHistory, currentPpq, barsVal, subdivisionPpq);
+    const int timeSigNum = processorRef.getCurrentTimeSigNum();
+    gridComponent.updateEvents (eventHistory, currentPpq, barsVal, subdivisionPpq, timeSigNum);
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::paint (juce::Graphics& g)
