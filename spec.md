@@ -116,7 +116,9 @@ struct HitEvent {
 | `internal_bpm`| Metronome BPM | Float | 40.0 to 300.0 BPM | 120.0 BPM |
 | `time_sig_num`| Time Sig Numerator | Int | 2 to 12 | 4 |
 | `click_subdivision`| Click Subdivision | Choice | Off, 1/4 Notes, 1/8 Notes, 1/16 Notes, Triplets | 1/4 Notes |
+| `click_sample_preset`| Click Sound Preset| Choice | Woodblock, Digital Beep, Cowbell, Stick Click | Woodblock |
 | `click_volume`| Click Volume | Float | 0.0 to 1.0 (Linear gain) | 0.8 |
+| `click_pan`   | Click Panning | Float | -1.0 (L) to +1.0 (R) | 0.0 |
 | `click_enabled`| Metronome On/Off | Bool | Toggle | True |
 | `note_filter`  | Display Mode | Choice | All Notes, Roland/GM Drum Map, Custom | Roland/GM Drum Map |
 

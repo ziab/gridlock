@@ -70,11 +70,25 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
         1 // Default 1/4 Notes
     ));
 
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{ "click_sample_preset", 1 },
+        "Click Sound Preset",
+        juce::StringArray{ "Woodblock", "Digital Beep", "Cowbell", "Stick Click" },
+        0 // Default Woodblock
+    ));
+
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ "click_volume", 1 },
         "Click Volume",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
         0.8f
+    ));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ "click_pan", 1 },
+        "Click Panning",
+        juce::NormalisableRange<float>(-1.0f, 1.0f, 0.05f),
+        0.0f
     ));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
@@ -140,7 +154,9 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
     const float internalBpmVal = apvts.getRawParameterValue("internal_bpm")->load();
     const int timeSigNumVal = static_cast<int>(apvts.getRawParameterValue("time_sig_num")->load());
     const int clickSubChoice = static_cast<int>(apvts.getRawParameterValue("click_subdivision")->load());
+    const int clickPresetVal = static_cast<int>(apvts.getRawParameterValue("click_sample_preset")->load());
     const float clickVolVal = apvts.getRawParameterValue("click_volume")->load();
+    const float clickPanVal = apvts.getRawParameterValue("click_pan")->load();
     const bool clickEnabledVal = (apvts.getRawParameterValue("click_enabled")->load() > 0.5f);
 
     const double gridInterval = getSubdivisionPpq(subChoice);
@@ -192,7 +208,9 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
                                    currentBpm,
                                    currentTimeSigNum,
                                    clickSubChoice,
+                                   clickPresetVal,
                                    clickVolVal,
+                                   clickPanVal,
                                    clickEnabledVal);
     }
 

@@ -5,8 +5,8 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     : AudioProcessorEditor (&p), processorRef (p)
 {
     setResizable (true, true);
-    setResizeLimits (880, 440, 1920, 1080);
-    setSize (1100, 580);
+    setResizeLimits (960, 480, 1920, 1080);
+    setSize (1240, 600);
 
     addAndMakeVisible (gridComponent);
 
@@ -56,12 +56,25 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     clickSubLabel.setFont (juce::Font (11.0f, juce::Font::bold));
     clickSubLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
 
+    clickSoundComboBox.addItemList ({ "Woodblock", "Digital Beep", "Cowbell", "Stick Click" }, 1);
+    addAndMakeVisible (clickSoundComboBox);
+    clickSoundLabel.attachToComponent (&clickSoundComboBox, false);
+    clickSoundLabel.setFont (juce::Font (11.0f, juce::Font::bold));
+    clickSoundLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
+
     clickVolumeSlider.setSliderStyle (juce::Slider::LinearBar);
     clickVolumeSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 35, 20);
     addAndMakeVisible (clickVolumeSlider);
     clickVolLabel.attachToComponent (&clickVolumeSlider, false);
     clickVolLabel.setFont (juce::Font (11.0f, juce::Font::bold));
     clickVolLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
+
+    clickPanSlider.setSliderStyle (juce::Slider::LinearBar);
+    clickPanSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 35, 20);
+    addAndMakeVisible (clickPanSlider);
+    clickPanLabel.attachToComponent (&clickPanSlider, false);
+    clickPanLabel.setFont (juce::Font (11.0f, juce::Font::bold));
+    clickPanLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
 
     clickToggleButton.setClickingTogglesState (true);
     clickToggleButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
@@ -80,15 +93,17 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
 
     // Attach APVTS Parameters
     auto& apvts = processorRef.getAPVTS();
-    barsAttachment        = std::make_unique<ComboBoxAttachment>(apvts, "bars_window",       barsComboBox);
-    subdivisionAttachment = std::make_unique<ComboBoxAttachment>(apvts, "subdivision",       subdivisionComboBox);
-    toleranceAttachment   = std::make_unique<SliderAttachment>  (apvts, "tolerance_ms",      toleranceSlider);
-    velocityAttachment    = std::make_unique<SliderAttachment>  (apvts, "min_velocity",      velocitySlider);
-    bpmAttachment         = std::make_unique<SliderAttachment>  (apvts, "internal_bpm",      bpmSlider);
+    barsAttachment        = std::make_unique<ComboBoxAttachment>(apvts, "bars_window",         barsComboBox);
+    subdivisionAttachment = std::make_unique<ComboBoxAttachment>(apvts, "subdivision",         subdivisionComboBox);
+    toleranceAttachment   = std::make_unique<SliderAttachment>  (apvts, "tolerance_ms",        toleranceSlider);
+    velocityAttachment    = std::make_unique<SliderAttachment>  (apvts, "min_velocity",        velocitySlider);
+    bpmAttachment         = std::make_unique<SliderAttachment>  (apvts, "internal_bpm",        bpmSlider);
 
-    clickSubAttachment    = std::make_unique<ComboBoxAttachment>(apvts, "click_subdivision", clickSubComboBox);
-    clickVolumeAttachment = std::make_unique<SliderAttachment>  (apvts, "click_volume",      clickVolumeSlider);
-    clickEnabledAttachment= std::make_unique<ButtonAttachment>  (apvts, "click_enabled",     clickToggleButton);
+    clickSubAttachment    = std::make_unique<ComboBoxAttachment>(apvts, "click_subdivision",   clickSubComboBox);
+    clickSoundAttachment  = std::make_unique<ComboBoxAttachment>(apvts, "click_sample_preset", clickSoundComboBox);
+    clickVolumeAttachment = std::make_unique<SliderAttachment>  (apvts, "click_volume",        clickVolumeSlider);
+    clickPanAttachment    = std::make_unique<SliderAttachment>  (apvts, "click_pan",           clickPanSlider);
+    clickEnabledAttachment= std::make_unique<ButtonAttachment>  (apvts, "click_enabled",       clickToggleButton);
 
     // Custom time signature combo box handler mapping to time_sig_num
     timeSigComboBox.onChange = [this, &apvts]() {
@@ -188,33 +203,39 @@ void MidiGridAnalyzerAudioProcessorEditor::resized()
 
     int x = margin;
 
-    barsComboBox.setBounds (x, topMargin, 78, controlHeight);
+    barsComboBox.setBounds (x, topMargin, 74, controlHeight);
+    x += 78;
+
+    subdivisionComboBox.setBounds (x, topMargin, 74, controlHeight);
+    x += 78;
+
+    toleranceSlider.setBounds (x, topMargin, 90, controlHeight);
+    x += 94;
+
+    velocitySlider.setBounds (x, topMargin, 70, controlHeight);
+    x += 74;
+
+    bpmSlider.setBounds (x, topMargin, 80, controlHeight);
     x += 84;
 
-    subdivisionComboBox.setBounds (x, topMargin, 78, controlHeight);
-    x += 84;
+    timeSigComboBox.setBounds (x, topMargin, 64, controlHeight);
+    x += 68;
 
-    toleranceSlider.setBounds (x, topMargin, 95, controlHeight);
-    x += 101;
+    clickSubComboBox.setBounds (x, topMargin, 90, controlHeight);
+    x += 94;
 
-    velocitySlider.setBounds (x, topMargin, 75, controlHeight);
-    x += 81;
+    clickSoundComboBox.setBounds (x, topMargin, 95, controlHeight);
+    x += 99;
 
-    bpmSlider.setBounds (x, topMargin, 85, controlHeight);
-    x += 91;
+    clickVolumeSlider.setBounds (x, topMargin, 70, controlHeight);
+    x += 74;
 
-    timeSigComboBox.setBounds (x, topMargin, 70, controlHeight);
-    x += 76;
+    clickPanSlider.setBounds (x, topMargin, 70, controlHeight);
+    x += 74;
 
-    clickSubComboBox.setBounds (x, topMargin, 95, controlHeight);
-    x += 101;
+    clickToggleButton.setBounds (x, topMargin, 75, controlHeight);
 
-    clickVolumeSlider.setBounds (x, topMargin, 75, controlHeight);
-    x += 81;
-
-    clickToggleButton.setBounds (x, topMargin, 80, controlHeight);
-
-    clearButton.setBounds (getWidth() - 95, topMargin, 85, controlHeight);
+    clearButton.setBounds (getWidth() - 90, topMargin, 82, controlHeight);
 
     gridComponent.setBounds (0, headerHeight, getWidth(), getHeight() - headerHeight);
 }

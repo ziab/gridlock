@@ -3,6 +3,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_core/juce_core.h>
 #include <vector>
+#include <array>
 
 class ClickGenerator
 {
@@ -20,7 +21,9 @@ public:
                      double bpm,
                      int timeSigNum,
                      int clickSubdivisionIndex,
+                     int clickPresetIndex,
                      float clickVolume,
+                     float clickPan,
                      bool clickEnabled);
 
 private:
@@ -29,13 +32,16 @@ private:
         int currentSamplePosition{ 0 };
     };
 
-    void synthesizeSamples(double sampleRate);
+    struct ClickSet {
+        juce::AudioBuffer<float> highClick; // Accent (Beat 1)
+        juce::AudioBuffer<float> midClick;  // Regular Beats
+        juce::AudioBuffer<float> subClick;  // Subdivisions
+    };
+
+    void synthesizeAllPresets(double sampleRate);
     double getClickSubdivisionPpq(int index) const noexcept;
 
-    juce::AudioBuffer<float> highClickSample; // Beat 1 Downbeat
-    juce::AudioBuffer<float> midClickSample;  // Beats 2, 3, 4
-    juce::AudioBuffer<float> subClickSample;  // Subdivisions
-
+    std::array<ClickSet, 4> presetSamples;
     std::vector<ActiveSample> activeVoiceList;
     juce::Random random;
 
