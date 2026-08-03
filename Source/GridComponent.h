@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <vector>
 #include "HitEvent.h"
+#include "DrumMap.h"
 
 class GridComponent : public juce::Component
 {
@@ -28,11 +29,6 @@ public:
     static juce::Colour getContinuousHitColor(float deltaMs, float toleranceMs, float maxErrorMs) noexcept;
 
 private:
-    struct DrumLaneInfo {
-        juce::String label;
-        juce::Array<uint8_t> notes;
-    };
-
     std::vector<HitEvent> activeEvents;
     double currentPpqPos{ 0.0 };
     int barsWindow{ 4 };
@@ -44,7 +40,7 @@ private:
     float latencyOffsetMsVal{ 0.0f };
     float bpmVal{ 120.0f };
 
-    std::vector<DrumLaneInfo> drumLanes;
+    std::vector<DrumMap::LaneInfo> drumLanes;
     int getLaneIndexForNote(uint8_t note) const noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GridComponent)

@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "DrumMap.h"
 #include <cmath>
 #include <algorithm>
 
@@ -384,24 +385,30 @@ void MidiGridAnalyzerAudioProcessor::generateTestModeBeat(double blockStartPpq,
             };
 
             // 1. Hi-Hat on all 8th notes (humanized with 20% out-of-tolerance error distribution)
-            pushTestHit(42, static_cast<uint8_t>(95 + random.nextInt(15)), generateTestDevMs());
+            pushTestHit(DrumMap::ClosedHiHat,
+                        static_cast<uint8_t>(DrumMap::TestModeVelocity::BaseHiHat + random.nextInt(DrumMap::TestModeVelocity::HiHatRange)),
+                        generateTestDevMs());
 
             // 2. Kick on Beats 1 & 3
             if (!is8thAnd && (beatInBar == 0 || beatInBar == 2))
             {
-                pushTestHit(36, static_cast<uint8_t>(115 + random.nextInt(10)), generateTestDevMs());
+                pushTestHit(DrumMap::Kick,
+                            static_cast<uint8_t>(DrumMap::TestModeVelocity::BaseKick + random.nextInt(DrumMap::TestModeVelocity::KickRange)),
+                            generateTestDevMs());
             }
 
             // 3. Snare on Beats 2 & 4
             if (!is8thAnd && (beatInBar == 1 || beatInBar == 3))
             {
-                pushTestHit(38, static_cast<uint8_t>(118 + random.nextInt(8)), generateTestDevMs());
+                pushTestHit(DrumMap::SnareHead,
+                            static_cast<uint8_t>(DrumMap::TestModeVelocity::BaseSnare + random.nextInt(DrumMap::TestModeVelocity::SnareRange)),
+                            generateTestDevMs());
             }
 
             // 4. Crash Cymbal on Bar 1, Beat 1
             if (!is8thAnd && beatInBar == 0 && std::abs(std::fmod(tick, static_cast<double>(currentTimeSigNum) * 4.0)) < 0.001)
             {
-                pushTestHit(49, 125, generateTestDevMs());
+                pushTestHit(DrumMap::Crash1, DrumMap::TestModeVelocity::Crash, generateTestDevMs());
             }
         }
     }

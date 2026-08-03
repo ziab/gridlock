@@ -137,14 +137,10 @@ struct HitEvent {
 
 ---
 
-### 4.4 Test Mode Latency & Error Distribution Rules
-* **Synthesized Test Hits**:
-  - Target Compensated Position: `compPpq = tick + devPpq`.
-  - Stored Raw Position: `rawHitPpqPosition = compPpq + totalLatencyPpq`.
-  - **Error Distribution (20% Out-of-Tolerance)**:
-    - **80% On-Grid (Green `✓`)**: Timing deviation within $\pm(0.1 \dots 0.7) \times \text{Tolerance}$.
-    - **10% Rush (Yellow/Orange/Red)**: Timing deviation $-\text{Tolerance} \times (1.2 \dots 2.2)$.
-    - **10% Drag (Cyan/Blue/Purple)**: Timing deviation $+\text{Tolerance} \times (1.2 \dots 2.2)$.
+### 4.4 Centralized E-Kit Drum Map & Constants (`Source/DrumMap.h`)
+* **Single Source of Truth (`DrumMap.h`)**:
+  - Centralized General MIDI / Roland e-Kit constants: `Kick` (36), `SnareHead` (38), `SnareRim` (40), `ClosedHiHat` (42), `PedalHiHat` (44), `OpenHiHat` (46), `HighTom` (48), `MidTom` (45), `LowTom` (43), `Crash1` (49), `Ride` (51), `Crash2` (53).
+  - Standard drum lane layout `getStandardDrumLanes()` consumed directly by `GridComponent` and `PluginProcessor`. Zero magic note numbers in renderer or audio processor.
 
 ---
 

@@ -4,24 +4,20 @@
 
 GridComponent::GridComponent()
 {
-    drumLanes = {
-        { "CYMBALS", { 49, 51, 53 } },
-        { "HI-HAT",  { 42, 44, 46 } },
-        { "KICK",    { 36 } },
-        { "SNARE",   { 38, 40 } },
-        { "TOMS",    { 48, 45, 43 } },
-        { "OTHER",   {} }
-    };
+    drumLanes = DrumMap::getStandardDrumLanes();
 }
 
 int GridComponent::getLaneIndexForNote(uint8_t note) const noexcept
 {
-    if (note == 49 || note == 51 || note == 53) return 0; // Cymbals
-    if (note == 42 || note == 44 || note == 46) return 1; // Hi-Hat
-    if (note == 36) return 2;                             // Kick
-    if (note == 38 || note == 40) return 3;               // Snare Head / Rim
-    if (note == 48 || note == 45 || note == 43) return 4; // Toms
-    return 5;                                             // Other
+    for (size_t i = 0; i < drumLanes.size(); ++i)
+    {
+        for (uint8_t laneNote : drumLanes[i].notes)
+        {
+            if (laneNote == note)
+                return static_cast<int>(i);
+        }
+    }
+    return 5; // Default "OTHER" lane
 }
 
 juce::Colour GridComponent::getContinuousHitColor(float deltaMs, float toleranceMs, float maxErrorMs) noexcept
