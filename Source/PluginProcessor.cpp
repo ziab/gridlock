@@ -47,7 +47,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ "latency_offset_ms", 1 },
         "System Latency Offset",
-        juce::NormalisableRange<float>(-100.0f, 100.0f, 1.0f),
+        juce::NormalisableRange<float>(-500.0f, 500.0f, 1.0f),
         0.0f
     ));
 
