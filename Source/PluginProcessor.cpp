@@ -266,7 +266,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
     const double totalLatencyMs = autoLatencyMs + static_cast<double>(userLatencyMs);
     const double totalLatencyPpq = (totalLatencyMs / 1000.0) * (currentBpm / 60.0);
 
-    // Process incoming MIDI events (MIDI pass-through active regardless of pause)
+    // Process incoming physical MIDI events
     for (const auto metadata : midiMessages)
     {
         const auto msg = metadata.getMessage();
@@ -310,91 +310,100 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
     // Synthesize Humanized Rock Drum Beat in TEST / DEMO Mode
     if (testModeVal && !isPausedVal && currentTimeSigNum > 0)
     {
-        const double subInterval = 0.5; // 8th notes
-        const double firstTick = std::floor(blockStartPpq / subInterval) * subInterval;
-
-        for (double tick = firstTick; tick < blockEndPpq; tick += subInterval)
-        {
-            if (tick >= blockStartPpq && tick > lastTestBeatTick)
-            {
-                lastTestBeatTick = tick;
-
-                const double barPpq = std::fmod(tick, static_cast<double>(currentTimeSigNum));
-                const int beatInBar = static_cast<int>(std::floor(barPpq));
-                const double subFraction = std::fmod(tick, 1.0);
-                const bool is8thAnd = (std::abs(subFraction - 0.5) < 0.001);
-
-                auto pushTestHit = [this, tick, totalLatencyPpq, gridInterval, toleranceMs](uint8_t note, uint8_t vel, double devMs) {
-                    const double devPpq = (devMs / 1000.0) * (currentBpm / 60.0);
-                    const double targetCompPpq = tick + devPpq;
-                    const double rawPpq = targetCompPpq + totalLatencyPpq;
-
-                    const double nearestGrid = std::round(targetCompPpq / gridInterval) * gridInterval;
-                    const double deltaPpq = targetCompPpq - nearestGrid;
-                    const double deltaMs = (deltaPpq / (currentBpm / 60.0)) * 1000.0;
-                    const float normDev = std::clamp(static_cast<float>(deltaMs / static_cast<double>(toleranceMs)), -1.0f, 1.0f);
-
-                    HitEvent e;
-                    e.noteNumber = note;
-                    e.velocity = vel;
-                    e.rawHitPpqPosition = rawPpq;
-                    e.hitPpqPosition = targetCompPpq;
-                    e.deltaMs = deltaMs;
-                    e.normalizedDeviation = normDev;
-                    e.state = (std::abs(deltaMs) <= toleranceMs) ? TimingState::OnGrid : ((deltaMs < 0) ? TimingState::Rush : TimingState::Drag);
-                    ringBuffer.push(e);
-                };
-
-                auto generateTestDevMs = [this, toleranceMs]() -> double {
-                    const float roll = random.nextFloat();
-                    if (roll < 0.80f)
-                    {
-                        // 80% On-Grid (Inside tolerance range -> Green checkmark)
-                        const double factor = static_cast<double>(random.nextFloat() * 1.4f - 0.7f); // [-0.7, +0.7]
-                        return factor * static_cast<double>(toleranceMs);
-                    }
-                    else if (roll < 0.90f)
-                    {
-                        // 10% Rush / Early -> Yellow -> Orange -> Electric Red
-                        const double factor = static_cast<double>(1.25f + random.nextFloat() * 0.95f); // [-2.2, -1.25]
-                        return -factor * static_cast<double>(toleranceMs);
-                    }
-                    else
-                    {
-                        // 10% Drag / Late -> Cyan -> Deep Blue -> Vivid Purple
-                        const double factor = static_cast<double>(1.25f + random.nextFloat() * 0.95f); // [+1.25, +2.2]
-                        return factor * static_cast<double>(toleranceMs);
-                    }
-                };
-
-                // 1. Hi-Hat on all 8th notes (humanized with 20% out-of-tolerance error distribution)
-                pushTestHit(42, static_cast<uint8_t>(95 + random.nextInt(15)), generateTestDevMs());
-
-                // 2. Kick on Beats 1 & 3
-                if (!is8thAnd && (beatInBar == 0 || beatInBar == 2))
-                {
-                    pushTestHit(36, static_cast<uint8_t>(115 + random.nextInt(10)), generateTestDevMs());
-                }
-
-                // 3. Snare on Beats 2 & 4
-                if (!is8thAnd && (beatInBar == 1 || beatInBar == 3))
-                {
-                    pushTestHit(38, static_cast<uint8_t>(118 + random.nextInt(8)), generateTestDevMs());
-                }
-
-                // 4. Crash Cymbal on Bar 1, Beat 1
-                if (!is8thAnd && beatInBar == 0 && std::abs(std::fmod(tick, static_cast<double>(currentTimeSigNum) * 4.0)) < 0.001)
-                {
-                    pushTestHit(49, 125, generateTestDevMs());
-                }
-            }
-        }
+        generateTestModeBeat(blockStartPpq, blockEndPpq, totalLatencyPpq, gridInterval, toleranceMs);
     }
 
     // Advance internal clock position ONLY when not paused
     if (!isPausedVal)
     {
         internalPpqPosition += numSamples * (currentBpm / 60.0) / srToUse;
+    }
+}
+
+void MidiGridAnalyzerAudioProcessor::generateTestModeBeat(double blockStartPpq,
+                                                          double blockEndPpq,
+                                                          double totalLatencyPpq,
+                                                          double gridInterval,
+                                                          float toleranceMs)
+{
+    const double subInterval = 0.5; // 8th notes
+    const double firstTick = std::floor(blockStartPpq / subInterval) * subInterval;
+
+    for (double tick = firstTick; tick < blockEndPpq; tick += subInterval)
+    {
+        if (tick >= blockStartPpq && tick > lastTestBeatTick)
+        {
+            lastTestBeatTick = tick;
+
+            const double barPpq = std::fmod(tick, static_cast<double>(currentTimeSigNum));
+            const int beatInBar = static_cast<int>(std::floor(barPpq));
+            const double subFraction = std::fmod(tick, 1.0);
+            const bool is8thAnd = (std::abs(subFraction - 0.5) < 0.001);
+
+            auto pushTestHit = [this, tick, totalLatencyPpq, gridInterval, toleranceMs](uint8_t note, uint8_t vel, double devMs) {
+                const double devPpq = (devMs / 1000.0) * (currentBpm / 60.0);
+                const double targetCompPpq = tick + devPpq;
+                const double rawPpq = targetCompPpq + totalLatencyPpq;
+
+                const double nearestGrid = std::round(targetCompPpq / gridInterval) * gridInterval;
+                const double deltaPpq = targetCompPpq - nearestGrid;
+                const double deltaMs = (deltaPpq / (currentBpm / 60.0)) * 1000.0;
+                const float normDev = std::clamp(static_cast<float>(deltaMs / static_cast<double>(toleranceMs)), -1.0f, 1.0f);
+
+                HitEvent e;
+                e.noteNumber = note;
+                e.velocity = vel;
+                e.rawHitPpqPosition = rawPpq;
+                e.hitPpqPosition = targetCompPpq;
+                e.deltaMs = deltaMs;
+                e.normalizedDeviation = normDev;
+                e.state = (std::abs(deltaMs) <= toleranceMs) ? TimingState::OnGrid : ((deltaMs < 0) ? TimingState::Rush : TimingState::Drag);
+                ringBuffer.push(e);
+            };
+
+            auto generateTestDevMs = [this, toleranceMs]() -> double {
+                const float roll = random.nextFloat();
+                if (roll < 0.80f)
+                {
+                    // 80% On-Grid (Inside tolerance range -> Green checkmark)
+                    const double factor = static_cast<double>(random.nextFloat() * 1.4f - 0.7f); // [-0.7, +0.7]
+                    return factor * static_cast<double>(toleranceMs);
+                }
+                else if (roll < 0.90f)
+                {
+                    // 10% Rush / Early -> Yellow -> Orange -> Electric Red
+                    const double factor = static_cast<double>(1.25f + random.nextFloat() * 0.95f); // [-2.2, -1.25]
+                    return -factor * static_cast<double>(toleranceMs);
+                }
+                else
+                {
+                    // 10% Drag / Late -> Cyan -> Deep Blue -> Vivid Purple
+                    const double factor = static_cast<double>(1.25f + random.nextFloat() * 0.95f); // [+1.25, +2.2]
+                    return factor * static_cast<double>(toleranceMs);
+                }
+            };
+
+            // 1. Hi-Hat on all 8th notes (humanized with 20% out-of-tolerance error distribution)
+            pushTestHit(42, static_cast<uint8_t>(95 + random.nextInt(15)), generateTestDevMs());
+
+            // 2. Kick on Beats 1 & 3
+            if (!is8thAnd && (beatInBar == 0 || beatInBar == 2))
+            {
+                pushTestHit(36, static_cast<uint8_t>(115 + random.nextInt(10)), generateTestDevMs());
+            }
+
+            // 3. Snare on Beats 2 & 4
+            if (!is8thAnd && (beatInBar == 1 || beatInBar == 3))
+            {
+                pushTestHit(38, static_cast<uint8_t>(118 + random.nextInt(8)), generateTestDevMs());
+            }
+
+            // 4. Crash Cymbal on Bar 1, Beat 1
+            if (!is8thAnd && beatInBar == 0 && std::abs(std::fmod(tick, static_cast<double>(currentTimeSigNum) * 4.0)) < 0.001)
+            {
+                pushTestHit(49, 125, generateTestDevMs());
+            }
+        }
     }
 }
 

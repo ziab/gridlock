@@ -49,6 +49,7 @@ public:
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    void generateTestModeBeat(double blockStartPpq, double blockEndPpq, double totalLatencyPpq, double gridInterval, float toleranceMs);
 
     juce::AudioProcessorValueTreeState apvts;
     RingBuffer<4096> ringBuffer;
