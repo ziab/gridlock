@@ -127,6 +127,18 @@ void GridComponent::paint(juce::Graphics& g)
     const int numLanes = static_cast<int>(drumLanes.size());
     const float laneHeight = laneAreaHeight / static_cast<float>(numLanes);
 
+    // Calculate Dynamic Progressive Scaling Factors based on Window Size and Bars Window Zoom
+    float zoomScale = 1.0f;
+    if (barsWindow == 2) zoomScale = 1.4f;
+    else if (barsWindow == 1) zoomScale = 2.0f;
+
+    const float windowWidthScale = std::clamp(canvasWidth / 1200.0f, 0.75f, 2.5f);
+    const float laneHeightScale = std::clamp(laneHeight / 80.0f, 0.75f, 2.5f);
+    const float dynamicScale = std::clamp(zoomScale * windowWidthScale, 0.8f, 3.0f);
+
+    const float nodeRadius = 11.0f * dynamicScale; // Up to 26.4px radius (52.8px diameter circle node!)
+    const float strokeWidth = std::clamp(2.5f * dynamicScale, 2.0f, 6.0f);
+
     // Draw Top Ruler Header Background & Separator Line
     g.setColour(juce::Colour(0xff181b24));
     g.fillRect(juce::Rectangle<float>(0.0f, 0.0f, boundsWidth, rulerHeight));
@@ -165,9 +177,10 @@ void GridComponent::paint(juce::Graphics& g)
         g.setColour(juce::Colour(0xff2d3245));
         g.drawVerticalLine(static_cast<int>(labelWidth), y, y + laneHeight);
 
-        // Bold High-Contrast Text for Drum Lanes (Readable 4-6 ft away)
+        // Bold High-Contrast Text for Drum Lanes (Scaled dynamically for throne viewing)
+        const float laneFontHeight = std::clamp(16.0f * laneHeightScale, 14.0f, 32.0f);
         g.setColour(juce::Colour(0xfff0f2f8));
-        g.setFont(juce::Font(16.0f, juce::Font::bold));
+        g.setFont(juce::Font(laneFontHeight, juce::Font::bold));
         g.drawText(drumLanes[static_cast<size_t>(i)].label,
                    juce::Rectangle<float>(12.0f, y, labelWidth - 16.0f, laneHeight),
                    juce::Justification::centredLeft, true);
@@ -234,7 +247,6 @@ void GridComponent::paint(juce::Graphics& g)
     // Render Hit Events with Live Real-Time Latency & Tolerance Recalculation
     const double userLatencyPpq = (static_cast<double>(latencyOffsetMsVal) / 1000.0) * (static_cast<double>(bpmVal) / 60.0);
     const float maxErrorMs = static_cast<float>((subdivisionPpq / 2.0) * (60.0 / static_cast<double>(bpmVal)) * 1000.0);
-    const float nodeRadius = 11.0f; // High visibility hit nodes
 
     for (const auto& event : activeEvents)
     {
@@ -264,7 +276,7 @@ void GridComponent::paint(juce::Graphics& g)
 
         // Outer contrast ring
         g.setColour(juce::Colour(0xff0a0c10));
-        g.fillEllipse(hitRect.expanded(2.0f));
+        g.fillEllipse(hitRect.expanded(2.0f * dynamicScale));
 
         // Filled color node
         g.setColour(fillColour);
@@ -280,12 +292,13 @@ void GridComponent::paint(juce::Graphics& g)
             checkPath.lineTo (hitX + r * 0.65f, hitY - r * 0.45f);
 
             g.setColour (juce::Colour (0xff0a0c10));
-            g.strokePath (checkPath, juce::PathStrokeType (2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.strokePath (checkPath, juce::PathStrokeType (strokeWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
         else if (displayVelLabels)
         {
+            const float velFontHeight = std::clamp(10.0f * dynamicScale, 9.0f, 22.0f);
             g.setColour (juce::Colour (0xff000000));
-            g.setFont (juce::Font (10.0f, juce::Font::bold));
+            g.setFont (juce::Font (velFontHeight, juce::Font::bold));
             g.drawText (juce::String (event.velocity), hitRect, juce::Justification::centred, false);
         }
 
@@ -295,16 +308,17 @@ void GridComponent::paint(juce::Graphics& g)
             juce::String msText = juce::String(static_cast<int>(std::round(liveDeltaMs))) + "ms";
             if (liveDeltaMs > 0.0) msText = "+" + msText;
 
-            const float labelW = 44.0f;
-            const float labelH = 14.0f;
+            const float labelW = 44.0f * dynamicScale;
+            const float labelH = 14.0f * dynamicScale;
             const auto labelRect = juce::Rectangle<float>(hitX - (labelW * 0.5f), hitY + nodeRadius + 2.0f, labelW, labelH);
 
             // Dark background pill for throne-distance contrast
             g.setColour(juce::Colour(0xd00a0c10));
-            g.fillRoundedRectangle(labelRect, 3.0f);
+            g.fillRoundedRectangle(labelRect, 3.0f * dynamicScale);
 
+            const float msFontHeight = std::clamp(10.0f * dynamicScale, 9.0f, 22.0f);
             g.setColour(fillColour);
-            g.setFont(juce::Font(10.0f, juce::Font::bold));
+            g.setFont(juce::Font(msFontHeight, juce::Font::bold));
             g.drawText(msText, labelRect, juce::Justification::centred, false);
         }
     }
