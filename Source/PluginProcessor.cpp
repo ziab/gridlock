@@ -73,8 +73,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{ "click_sample_preset", 1 },
         "Click Sound Preset",
-        juce::StringArray{ "Woodblock", "Digital Beep", "Cowbell", "Stick Click" },
-        0 // Default Woodblock
+        juce::StringArray{ "Wood Clave", "Drum Stick Click", "Digital Beep", "Cowbell" },
+        0 // Default Wood Clave
     ));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(

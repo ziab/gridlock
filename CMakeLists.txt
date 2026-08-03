@@ -15,6 +15,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(juce)
 
+# Embed WAV sound assets
+juce_add_binary_data(MidiGridAnalyzerAssets
+    HEADER_NAME "BinaryData.h"
+    NAMESPACE "BinaryData"
+    SOURCES
+        assets/sounds/wood_clave.wav
+        assets/sounds/Drum_Stick_Click_01.wav
+)
+
 # Define JUCE Audio Plugin & Standalone target
 juce_add_plugin(MidiGridAnalyzer
     COMPANY_NAME "Gridlock"
@@ -44,13 +53,15 @@ target_sources(MidiGridAnalyzer PRIVATE
     Source/PluginEditor.cpp
 )
 
-# Link JUCE Modules
+# Link JUCE Modules and Embedded Binary Data
 target_link_libraries(MidiGridAnalyzer PRIVATE
+    MidiGridAnalyzerAssets
     juce::juce_audio_utils
     juce::juce_audio_processors
     juce::juce_audio_basics
     juce::juce_gui_basics
     juce::juce_graphics
+    juce::juce_audio_formats
 )
 
 target_compile_definitions(MidiGridAnalyzer PRIVATE

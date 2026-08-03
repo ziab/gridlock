@@ -39,6 +39,7 @@ private:
     };
 
     void synthesizeAllPresets(double sampleRate);
+    void loadWavPreset(const char* wavData, int dataSize, double sampleRate, ClickSet& set);
     double getClickSubdivisionPpq(int index) const noexcept;
 
     std::array<ClickSet, 4> presetSamples;

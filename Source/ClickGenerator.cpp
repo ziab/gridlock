@@ -1,4 +1,6 @@
 #include "ClickGenerator.h"
+#include "BinaryData.h"
+#include <juce_audio_formats/juce_audio_formats.h>
 #include <cmath>
 #include <algorithm>
 
@@ -20,9 +22,56 @@ void ClickGenerator::reset()
     activeVoiceList.clear();
 }
 
+void ClickGenerator::loadWavPreset(const char* wavData, int dataSize, double sampleRate, ClickSet& set)
+{
+    if (wavData == nullptr || dataSize <= 0) return;
+
+    juce::AudioFormatManager formatManager;
+    formatManager.registerBasicFormats();
+
+    auto stream = std::make_unique<juce::MemoryInputStream>(wavData, static_cast<size_t>(dataSize), false);
+    std::unique_ptr<juce::AudioFormatReader> reader (formatManager.createReaderFor (std::move (stream)));
+
+    if (reader != nullptr && reader->lengthInSamples > 0)
+    {
+        juce::AudioBuffer<float> monoBuffer(1, static_cast<int>(reader->lengthInSamples));
+        reader->read(&monoBuffer, 0, static_cast<int>(reader->lengthInSamples), 0, true, true);
+
+        const double targetSr = (sampleRate > 0.0) ? sampleRate : 44100.0;
+        if (reader->sampleRate > 0.0 && std::abs(reader->sampleRate - targetSr) > 1.0)
+        {
+            const double ratio = reader->sampleRate / targetSr;
+            const int newLen = std::max(1, static_cast<int>(std::ceil(reader->lengthInSamples / ratio)));
+
+            set.midClick.setSize(1, newLen);
+            juce::LagrangeInterpolator interpolator;
+            interpolator.process(ratio, monoBuffer.getReadPointer(0), set.midClick.getWritePointer(0), newLen);
+        }
+        else
+        {
+            set.midClick.setSize(1, monoBuffer.getNumSamples());
+            set.midClick.copyFrom(0, 0, monoBuffer, 0, 0, monoBuffer.getNumSamples());
+        }
+
+        // High Click: Beat 1 accent (slightly boosted gain)
+        set.highClick.setSize(1, set.midClick.getNumSamples());
+        set.highClick.copyFrom(0, 0, set.midClick, 0, 0, set.midClick.getNumSamples());
+        set.highClick.applyGain(1.3f);
+
+        // Sub Click: Subdivisions (subtler gain)
+        set.subClick.setSize(1, set.midClick.getNumSamples());
+        set.subClick.copyFrom(0, 0, set.midClick, 0, 0, set.midClick.getNumSamples());
+        set.subClick.applyGain(0.55f);
+    }
+}
+
 void ClickGenerator::synthesizeAllPresets(double sampleRate)
 {
     const double sr = (sampleRate > 0.0) ? sampleRate : 44100.0;
+
+    // Load embedded WAV presets
+    loadWavPreset(BinaryData::wood_clave_wav, BinaryData::wood_clave_wavSize, sr, presetSamples[0]);
+    loadWavPreset(BinaryData::Drum_Stick_Click_01_wav, BinaryData::Drum_Stick_Click_01_wavSize, sr, presetSamples[1]);
 
     auto makeToneBuffer = [this, sr](juce::AudioBuffer<float>& target, float freq, float durationMs, float gain, float noiseAmt, float decayExponent) {
         const int numSamples = std::max(1, static_cast<int>(std::ceil(sr * (durationMs / 1000.0))));
@@ -65,25 +114,15 @@ void ClickGenerator::synthesizeAllPresets(double sampleRate)
         }
     };
 
-    // Preset 0: Woodblock
-    makeToneBuffer(presetSamples[0].highClick, 1600.0f, 18.0f, 1.00f, 0.25f, 10.0f);
-    makeToneBuffer(presetSamples[0].midClick,  1050.0f, 14.0f, 0.75f, 0.25f, 10.0f);
-    makeToneBuffer(presetSamples[0].subClick,  750.0f,  10.0f, 0.45f, 0.25f, 12.0f);
+    // Preset 2: Digital Beep
+    makeToneBuffer(presetSamples[2].highClick, 1600.0f, 15.0f, 1.00f, 0.00f, 6.0f);
+    makeToneBuffer(presetSamples[2].midClick,  800.0f,  12.0f, 0.75f, 0.00f, 6.0f);
+    makeToneBuffer(presetSamples[2].subClick,  600.0f,  8.0f,  0.45f, 0.00f, 8.0f);
 
-    // Preset 1: Digital Beep
-    makeToneBuffer(presetSamples[1].highClick, 1600.0f, 15.0f, 1.00f, 0.00f, 6.0f);
-    makeToneBuffer(presetSamples[1].midClick,  800.0f,  12.0f, 0.75f, 0.00f, 6.0f);
-    makeToneBuffer(presetSamples[1].subClick,  600.0f,  8.0f,  0.45f, 0.00f, 8.0f);
-
-    // Preset 2: Cowbell
-    makeDualToneBuffer(presetSamples[2].highClick, 800.0f, 540.0f, 25.0f, 1.00f);
-    makeDualToneBuffer(presetSamples[2].midClick,  560.0f, 380.0f, 20.0f, 0.75f);
-    makeDualToneBuffer(presetSamples[2].subClick,  440.0f, 300.0f, 12.0f, 0.45f);
-
-    // Preset 3: Stick Click
-    makeToneBuffer(presetSamples[3].highClick, 2500.0f, 8.0f, 1.00f, 0.85f, 20.0f);
-    makeToneBuffer(presetSamples[3].midClick,  2000.0f, 6.0f, 0.75f, 0.85f, 22.0f);
-    makeToneBuffer(presetSamples[3].subClick,  1500.0f, 5.0f, 0.45f, 0.85f, 25.0f);
+    // Preset 3: Cowbell
+    makeDualToneBuffer(presetSamples[3].highClick, 800.0f, 540.0f, 25.0f, 1.00f);
+    makeDualToneBuffer(presetSamples[3].midClick,  560.0f, 380.0f, 20.0f, 0.75f);
+    makeDualToneBuffer(presetSamples[3].subClick,  440.0f, 300.0f, 12.0f, 0.45f);
 }
 
 double ClickGenerator::getClickSubdivisionPpq(int index) const noexcept
@@ -146,14 +185,17 @@ void ClickGenerator::renderBlock(juce::AudioBuffer<float>& outputBuffer,
                     targetSample = &currentClickSet.midClick;
                 }
 
-                activeVoiceList.push_back({ targetSample, -sampleOffset });
+                if (targetSample->getNumSamples() > 0)
+                {
+                    activeVoiceList.push_back({ targetSample, -sampleOffset });
+                }
             }
         }
     }
 
     // Equal-Power Stereo Panning Law
     const float panNorm = std::clamp(clickPan, -1.0f, 1.0f);
-    const float angle = (panNorm + 1.0f) * juce::MathConstants<float>::pi * 0.25f; // 0 to PI/2
+    const float angle = (panNorm + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
     const float leftGain = clickVolume * std::cos(angle);
     const float rightGain = clickVolume * std::sin(angle);
 

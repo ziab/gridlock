@@ -73,7 +73,7 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     clickSubLabel.setFont (juce::Font (11.0f, juce::Font::bold));
     clickSubLabel.setColour (juce::Label::textColourId, juce::Colour (0xffb0b8c8));
 
-    clickSoundComboBox.addItemList ({ "Woodblock", "Digital Beep", "Cowbell", "Stick Click" }, 1);
+    clickSoundComboBox.addItemList ({ "Wood Clave", "Drum Stick Click", "Digital Beep", "Cowbell" }, 1);
     addAndMakeVisible (clickSoundComboBox);
     clickSoundLabel.attachToComponent (&clickSoundComboBox, false);
     clickSoundLabel.setFont (juce::Font (11.0f, juce::Font::bold));
