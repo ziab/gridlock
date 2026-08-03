@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "RingBuffer.h"
+#include "HitEvent.h"
 #include "ClickGenerator.h"
 
 class MidiGridAnalyzerAudioProcessor  : public juce::AudioProcessor
@@ -24,7 +25,7 @@ public:
 
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return true; }
-    bool isMidiEffect() const override { return false; } // Audio + MIDI output enabled
+    bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 
     int getNumPrograms() override { return 1; }
@@ -36,19 +37,19 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    juce::AudioProcessorValueTreeState& getAPVTS() { return apvts; }
-    RingBuffer<4096>& getRingBuffer() { return ringBuffer; }
-    
+    RingBuffer<4096>& getRingBuffer() noexcept { return ringBuffer; }
+    juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts; }
+
     double getCurrentPpqPosition() const noexcept { return currentPpqPosition; }
     double getCurrentBpm() const noexcept { return currentBpm; }
     int getCurrentTimeSigNum() const noexcept { return currentTimeSigNum; }
-    bool isHostPlaying() const noexcept { return hostIsPlaying; }
     bool isStandaloneAppMode() const noexcept { return isStandaloneMode; }
 
-    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     static double getSubdivisionPpq(int index) noexcept;
 
 private:
+    juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
     juce::AudioProcessorValueTreeState apvts;
     RingBuffer<4096> ringBuffer;
     ClickGenerator clickGenerator;
@@ -59,6 +60,9 @@ private:
     int currentTimeSigNum{ 4 };
     bool hostIsPlaying{ false };
     bool isStandaloneMode{ false };
+
+    double lastTestBeatTick{ -1.0 };
+    juce::Random random;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiGridAnalyzerAudioProcessor)
 };

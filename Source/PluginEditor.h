@@ -39,6 +39,7 @@ private:
     juce::TextButton pauseButton{ "PAUSE" };
     juce::TextButton showMsButton{ "MS OFFSETS" };
     juce::TextButton showVelButton{ "VELOCITY" };
+    juce::TextButton testButton{ "TEST MODE" };
     juce::TextButton clearButton{ "Clear Grid" };
 
     // Labels
@@ -74,6 +75,7 @@ private:
     std::unique_ptr<ButtonAttachment> pauseAttachment;
     std::unique_ptr<ButtonAttachment> showMsAttachment;
     std::unique_ptr<ButtonAttachment> showVelAttachment;
+    std::unique_ptr<ButtonAttachment> testAttachment;
 
     std::vector<HitEvent> eventHistory;
 

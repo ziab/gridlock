@@ -13,6 +13,18 @@ MidiGridAnalyzerAudioProcessor::MidiGridAnalyzerAudioProcessor()
 #else
     isStandaloneMode = juce::JUCEApplicationBase::isStandaloneApp();
 #endif
+
+    // Check command line arguments for --test or --demo flags
+    auto commandLineArgs = juce::JUCEApplicationBase::getCommandLineParameterArray();
+    for (const auto& arg : commandLineArgs)
+    {
+        if (arg.containsIgnoreCase("test") || arg.containsIgnoreCase("demo"))
+        {
+            if (auto* param = apvts.getParameter("test_mode"))
+                param->setValueNotifyingHost(1.0f);
+            break;
+        }
+    }
 }
 
 MidiGridAnalyzerAudioProcessor::~MidiGridAnalyzerAudioProcessor()
@@ -122,6 +134,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
         false
     ));
 
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ "test_mode", 1 },
+        "Rock Beat Demo Mode",
+        false
+    ));
+
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{ "note_filter", 1 },
         "Display Mode",
@@ -148,6 +166,7 @@ void MidiGridAnalyzerAudioProcessor::prepareToPlay (double sampleRate, int sampl
 {
     juce::ignoreUnused (samplesPerBlock);
     internalPpqPosition = 0.0;
+    lastTestBeatTick = -1.0;
     ringBuffer.reset();
     clickGenerator.prepareToPlay(sampleRate);
 }
@@ -175,7 +194,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
     // Read parameter values safely
     const int subChoice = static_cast<int>(apvts.getRawParameterValue("subdivision")->load());
     const float toleranceMs = apvts.getRawParameterValue("tolerance_ms")->load();
-    const float latencyOffsetMs = apvts.getRawParameterValue("latency_offset_ms")->load();
+    const float userLatencyMs = apvts.getRawParameterValue("latency_offset_ms")->load();
     const int minVelocity = static_cast<int>(apvts.getRawParameterValue("min_velocity")->load());
     const float internalBpmVal = apvts.getRawParameterValue("internal_bpm")->load();
     const int timeSigNumVal = static_cast<int>(apvts.getRawParameterValue("time_sig_num")->load());
@@ -185,6 +204,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
     const float clickPanVal = apvts.getRawParameterValue("click_pan")->load();
     const bool clickEnabledVal = (apvts.getRawParameterValue("click_enabled")->load() > 0.5f);
     const bool isPausedVal = (apvts.getRawParameterValue("is_paused")->load() > 0.5f);
+    const bool testModeVal = (apvts.getRawParameterValue("test_mode")->load() > 0.5f);
 
     const double gridInterval = getSubdivisionPpq(subChoice);
 
@@ -224,6 +244,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
 
     const double srToUse = (sampleRate > 0.0) ? sampleRate : 44100.0;
     const double blockStartPpq = currentPpqPosition;
+    const double blockEndPpq = blockStartPpq + numSamples * (currentBpm / 60.0) / srToUse;
 
     // Render Audio Click ONLY in Standalone mode when NOT paused
     if (isStandaloneMode && !isPausedVal)
@@ -241,7 +262,6 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
                                    clickEnabledVal);
     }
 
-    const float userLatencyMs = apvts.getRawParameterValue("latency_offset_ms")->load();
     const double autoLatencyMs = (static_cast<double>(getLatencySamples()) / srToUse) * 1000.0;
     const double totalLatencyMs = autoLatencyMs + static_cast<double>(userLatencyMs);
     const double totalLatencyPpq = (totalLatencyMs / 1000.0) * (currentBpm / 60.0);
@@ -284,6 +304,70 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
             event.state = state;
 
             ringBuffer.push(event);
+        }
+    }
+
+    // Synthesize Humanized Rock Drum Beat in TEST / DEMO Mode
+    if (testModeVal && !isPausedVal && currentTimeSigNum > 0)
+    {
+        const double subInterval = 0.5; // 8th notes
+        const double firstTick = std::floor(blockStartPpq / subInterval) * subInterval;
+
+        for (double tick = firstTick; tick < blockEndPpq; tick += subInterval)
+        {
+            if (tick >= blockStartPpq && tick > lastTestBeatTick)
+            {
+                lastTestBeatTick = tick;
+
+                const double barPpq = std::fmod(tick, static_cast<double>(currentTimeSigNum));
+                const int beatInBar = static_cast<int>(std::floor(barPpq));
+                const double subFraction = std::fmod(tick, 1.0);
+                const bool is8thAnd = (std::abs(subFraction - 0.5) < 0.001);
+
+                auto pushTestHit = [this, tick, totalLatencyPpq, gridInterval, toleranceMs](uint8_t note, uint8_t vel, double devMs) {
+                    const double devPpq = (devMs / 1000.0) * (currentBpm / 60.0);
+                    const double rawPpq = tick + devPpq;
+
+                    const double nearestGrid = std::round(rawPpq / gridInterval) * gridInterval;
+                    const double deltaPpq = rawPpq - nearestGrid;
+                    const double deltaMs = (deltaPpq / (currentBpm / 60.0)) * 1000.0;
+                    const float normDev = std::clamp(static_cast<float>(deltaMs / static_cast<double>(toleranceMs)), -1.0f, 1.0f);
+
+                    HitEvent e;
+                    e.noteNumber = note;
+                    e.velocity = vel;
+                    e.rawHitPpqPosition = rawPpq;
+                    e.hitPpqPosition = rawPpq - totalLatencyPpq;
+                    e.deltaMs = deltaMs;
+                    e.normalizedDeviation = normDev;
+                    e.state = (std::abs(deltaMs) <= toleranceMs) ? TimingState::OnGrid : ((deltaMs < 0) ? TimingState::Rush : TimingState::Drag);
+                    ringBuffer.push(e);
+                };
+
+                // 1. Hi-Hat on all 8th notes (humanized)
+                const double hhDev = static_cast<double>(random.nextFloat() * 12.0f - 6.0f);
+                pushTestHit(42, static_cast<uint8_t>(95 + random.nextInt(15)), hhDev);
+
+                // 2. Kick on Beats 1 & 3
+                if (!is8thAnd && (beatInBar == 0 || beatInBar == 2))
+                {
+                    const double kickDev = static_cast<double>(random.nextFloat() * 6.0f - 3.0f);
+                    pushTestHit(36, static_cast<uint8_t>(115 + random.nextInt(10)), kickDev);
+                }
+
+                // 3. Snare on Beats 2 & 4 (slightly dragged +14ms for rock feel)
+                if (!is8thAnd && (beatInBar == 1 || beatInBar == 3))
+                {
+                    const double snareDev = 14.0 + static_cast<double>(random.nextFloat() * 8.0f - 4.0f);
+                    pushTestHit(38, static_cast<uint8_t>(118 + random.nextInt(8)), snareDev);
+                }
+
+                // 4. Crash Cymbal on Bar 1, Beat 1
+                if (!is8thAnd && beatInBar == 0 && std::abs(std::fmod(tick, static_cast<double>(currentTimeSigNum) * 4.0)) < 0.001)
+                {
+                    pushTestHit(49, 125, -2.0);
+                }
+            }
         }
     }
 

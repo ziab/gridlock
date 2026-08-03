@@ -11,9 +11,9 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     if (auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
     {
         const auto area = display->userArea;
-        const int minW = std::min(980, area.getWidth() / 2);
+        const int minW = std::min(1080, area.getWidth() / 2);
         const int minH = std::min(480, area.getHeight() / 2);
-        const int defaultW = std::min(1480, static_cast<int>(area.getWidth() * 0.88));
+        const int defaultW = std::min(1560, static_cast<int>(area.getWidth() * 0.9));
         const int defaultH = std::min(680, static_cast<int>(area.getHeight() * 0.8));
 
         setResizeLimits (minW, minH, area.getWidth(), area.getHeight());
@@ -21,8 +21,8 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     }
     else
     {
-        setResizeLimits (980, 480, 1920, 1080);
-        setSize (1480, 640);
+        setResizeLimits (1080, 480, 1920, 1080);
+        setSize (1560, 640);
     }
 
     addAndMakeVisible (gridComponent);
@@ -131,6 +131,13 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     showVelButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xffffffff));
     addAndMakeVisible (showVelButton);
 
+    testButton.setClickingTogglesState (true);
+    testButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
+    testButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffec4899)); // Hot Pink TEST
+    testButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffec4899));
+    testButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xffffffff));
+    addAndMakeVisible (testButton);
+
     clearButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
     clearButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffffffff));
     addAndMakeVisible (clearButton);
@@ -156,6 +163,7 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     pauseAttachment       = std::make_unique<ButtonAttachment>  (apvts, "is_paused",           pauseButton);
     showMsAttachment      = std::make_unique<ButtonAttachment>  (apvts, "show_ms_labels",      showMsButton);
     showVelAttachment     = std::make_unique<ButtonAttachment>  (apvts, "show_velocity_labels",showVelButton);
+    testAttachment        = std::make_unique<ButtonAttachment>  (apvts, "test_mode",           testButton);
 
     // Custom time signature combo box handler mapping to time_sig_num
     timeSigComboBox.onChange = [this, &apvts]() {
@@ -321,6 +329,9 @@ void MidiGridAnalyzerAudioProcessorEditor::resized()
     x += 89;
 
     showVelButton.setBounds (x, topMargin, 76, controlHeight);
+    x += 80;
+
+    testButton.setBounds (x, topMargin, 85, controlHeight);
 
     clearButton.setBounds (getWidth() - 85, topMargin, 78, controlHeight);
 
