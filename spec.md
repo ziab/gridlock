@@ -104,7 +104,10 @@ struct HitEvent {
    * High-quality sample buffers for Downbeat (High), Beat (Mid), and Subdivision (Low) clicks.
    * Trigger sample playback accurately at sample-exact offsets in `processBlock` based on BPM, Time Signature, and Click Subdivision settings.
 3. **MIDI Pass-Through & Crosstalk Filtering:** Pass MIDI through with zero latency while discarding Note-On events with `velocity < min_velocity`.
-4. **Sub-block Timing Precision & Continuous Ratio:** Calculate exact PPQ hit timestamp and compute `normalizedDeviation = std::clamp(deltaMs / toleranceMs, -1.0f, 1.0f)`.
+4. **Sub-block Timing Precision & Latency Compensation:**
+   * Automatically query hardware audio output latency (`getOutputLatency()`) and add user manual offset (`latency_offset_ms`).
+   * Compensate both the visual PPQ node position (`event.hitPpqPosition`) and the millisecond error (`event.deltaMs`) so hits shift visually on the grid to align with grid lines.
+   * Compute `normalizedDeviation = std::clamp(deltaMs / toleranceMs, -1.0f, 1.0f)`.
 5. **Lock-Free Push:** Push `HitEvent` to `RingBuffer` for GUI rendering.
 
 ---

@@ -235,6 +235,11 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
                                    clickEnabledVal);
     }
 
+    const float userLatencyMs = apvts.getRawParameterValue("latency_offset_ms")->load();
+    const double autoLatencyMs = (static_cast<double>(getLatencySamples()) / srToUse) * 1000.0;
+    const double totalLatencyMs = autoLatencyMs + static_cast<double>(userLatencyMs);
+    const double totalLatencyPpq = (totalLatencyMs / 1000.0) * (currentBpm / 60.0);
+
     // Process incoming MIDI events (MIDI pass-through active regardless of pause)
     for (const auto metadata : midiMessages)
     {
@@ -243,14 +248,14 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
         if (msg.isNoteOn() && msg.getVelocity() >= minVelocity)
         {
             const int sampleOffset = metadata.samplePosition;
-            const double hitPpq = currentPpqPosition + (sampleOffset * (currentBpm / 60.0) / srToUse);
+            const double rawHitPpq = currentPpqPosition + (sampleOffset * (currentBpm / 60.0) / srToUse);
 
-            const double nearestGridPpq = std::round(hitPpq / gridInterval) * gridInterval;
-            const double deltaPpq = hitPpq - nearestGridPpq;
-            const double rawDeltaMs = (deltaPpq / (currentBpm / 60.0)) * 1000.0;
+            // Shift hit PPQ by total system latency so circle node snaps onto visual grid line
+            const double compensatedHitPpq = rawHitPpq - totalLatencyPpq;
 
-            // System Latency Compensation Offset
-            const double deltaMs = rawDeltaMs - static_cast<double>(latencyOffsetMs);
+            const double nearestGridPpq = std::round(compensatedHitPpq / gridInterval) * gridInterval;
+            const double deltaPpq = compensatedHitPpq - nearestGridPpq;
+            const double deltaMs = (deltaPpq / (currentBpm / 60.0)) * 1000.0;
 
             const float normalizedDev = std::clamp(static_cast<float>(deltaMs / static_cast<double>(toleranceMs)), -1.0f, 1.0f);
 
@@ -266,7 +271,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
             HitEvent event;
             event.noteNumber = static_cast<uint8_t>(msg.getNoteNumber());
             event.velocity = static_cast<uint8_t>(msg.getVelocity());
-            event.hitPpqPosition = hitPpq;
+            event.hitPpqPosition = compensatedHitPpq;
             event.deltaMs = deltaMs;
             event.normalizedDeviation = normalizedDev;
             event.state = state;
