@@ -34,6 +34,7 @@ private:
     juce::Slider clickVolumeSlider;
     juce::Slider clickPanSlider;
     juce::TextButton clickToggleButton{ "CLICK ON" };
+    juce::TextButton fullscreenButton{ "FULL SCREEN" };
     juce::TextButton clearButton{ "Clear Grid" };
 
     // Labels

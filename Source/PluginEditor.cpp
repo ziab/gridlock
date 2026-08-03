@@ -5,8 +5,8 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     : AudioProcessorEditor (&p), processorRef (p)
 {
     setResizable (true, true);
-    setResizeLimits (960, 480, 1920, 1080);
-    setSize (1240, 600);
+    setResizeLimits (960, 480, 2560, 1440);
+    setSize (1320, 640);
 
     addAndMakeVisible (gridComponent);
 
@@ -82,6 +82,21 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     clickToggleButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffffffff));
     clickToggleButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xffffffff));
     addAndMakeVisible (clickToggleButton);
+
+    fullscreenButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff1e293b));
+    fullscreenButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xff38bdf8));
+    addAndMakeVisible (fullscreenButton);
+    fullscreenButton.onClick = [this]() {
+        if (auto* topLevel = getTopLevelComponent())
+        {
+            if (auto* window = dynamic_cast<juce::ResizableWindow*>(topLevel))
+            {
+                const bool isFull = window->isFullScreen();
+                window->setFullScreen (!isFull);
+                fullscreenButton.setButtonText (isFull ? "FULL SCREEN" : "RESTORE");
+            }
+        }
+    };
 
     clearButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
     clearButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffffffff));
@@ -235,6 +250,7 @@ void MidiGridAnalyzerAudioProcessorEditor::resized()
 
     clickToggleButton.setBounds (x, topMargin, 75, controlHeight);
 
+    fullscreenButton.setBounds (getWidth() - 195, topMargin, 95, controlHeight);
     clearButton.setBounds (getWidth() - 90, topMargin, 82, controlHeight);
 
     gridComponent.setBounds (0, headerHeight, getWidth(), getHeight() - headerHeight);
