@@ -82,6 +82,7 @@ void GridComponent::updateEvents(const std::vector<HitEvent>& events,
                                  double gridSubdivisionPpq,
                                  int timeSigNum,
                                  bool showMsLabels,
+                                 bool showVelocityLabels,
                                  float toleranceMs,
                                  float latencyOffsetMs,
                                  float bpm)
@@ -92,6 +93,7 @@ void GridComponent::updateEvents(const std::vector<HitEvent>& events,
     subdivisionPpq = (gridSubdivisionPpq > 0.0) ? gridSubdivisionPpq : 0.25;
     timeSigNumerator = (timeSigNum > 0) ? timeSigNum : 4;
     displayMsLabels = showMsLabels;
+    displayVelLabels = showVelocityLabels;
     toleranceMsVal = (toleranceMs >= 0.0f) ? toleranceMs : 20.0f;
     latencyOffsetMsVal = latencyOffsetMs;
     bpmVal = (bpm > 0.0f) ? bpm : 120.0f;
@@ -253,6 +255,7 @@ void GridComponent::paint(juce::Graphics& g)
         const double nearestGridPpq = std::round(compPpq / subdivisionPpq) * subdivisionPpq;
         const double deltaPpq = compPpq - nearestGridPpq;
         const double liveDeltaMs = (deltaPpq / (static_cast<double>(bpmVal) / 60.0)) * 1000.0;
+        const float absDelta = static_cast<float>(std::abs(liveDeltaMs));
 
         const float normalizedX = static_cast<float>((compPpq - minPpq) / totalPpqWindow);
         const float hitX = canvasLeft + (normalizedX * canvasWidth);
@@ -271,10 +274,19 @@ void GridComponent::paint(juce::Graphics& g)
         g.setColour(fillColour);
         g.fillEllipse(hitRect);
 
-        // Draw Velocity inside node
+        // Draw Checkmark '✓' inside node for hits within tolerance; draw Velocity only if enabled
         g.setColour(juce::Colour(0xff000000));
-        g.setFont(juce::Font(10.0f, juce::Font::bold));
-        g.drawText(juce::String(event.velocity), hitRect, juce::Justification::centred, false);
+
+        if (absDelta <= toleranceMsVal)
+        {
+            g.setFont(juce::Font(13.0f, juce::Font::bold));
+            g.drawText(juce::String(juce::CharPointer_UTF8("\xe2\x9c\x93")), hitRect, juce::Justification::centred, false);
+        }
+        else if (displayVelLabels)
+        {
+            g.setFont(juce::Font(10.0f, juce::Font::bold));
+            g.drawText(juce::String(event.velocity), hitRect, juce::Justification::centred, false);
+        }
 
         // Display MS Offset Label underneath note if enabled
         if (displayMsLabels)

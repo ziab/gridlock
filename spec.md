@@ -131,16 +131,18 @@ struct HitEvent {
 | `click_enabled`| Metronome On/Off | Bool | Toggle | True |
 | `is_paused`   | Pause/Freeze Grid| Bool | Toggle | False |
 | `show_ms_labels`| Display MS Offsets| Bool| Toggle | True |
+| `show_velocity_labels`| Display Velocity| Bool| Toggle | False |
 | `note_filter`  | Display Mode | Choice | All Notes, Roland/GM Drum Map, Custom | Roland/GM Drum Map |
 
 ---
 
 ### 4.4 GUI Component & Continuous Color Mapping (`GridComponent.h` / `.cpp`)
 
-* **Instant Tolerance Boundary & Color Falloff Algorithm**:
+* **Instant Tolerance Boundary, Checkmark & Color Falloff Algorithm**:
   - `MaxErrorMs` $= (\text{subdivisionPpq} / 2.0) \times (60.0 / \text{BPM}) \times 1000.0$.
-  - **Within Tolerance ($|\Delta\text{ms}| \le \text{Tolerance}$):** Pure Emerald Green (`#00FF88`).
-  - **Beyond Tolerance ($|\Delta\text{ms}| > \text{Tolerance}$):** Falloff ratio $t = \text{clamp}\left(\frac{|\Delta\text{ms}| - \text{Tolerance}}{\text{MaxErrorMs} - \text{Tolerance}}, 0.0, 1.0\right)$.
+  - **Within Tolerance ($|\Delta\text{ms}| \le \text{Tolerance}$):** Pure Emerald Green (`#00FF88`) with a bold **Checkmark symbol (`✓`)** rendered inside the note circle.
+  - **Beyond Tolerance ($|\Delta\text{ms}| > \text{Tolerance}$):** Render velocity number inside note circle *only* when `show_velocity_labels` is enabled; otherwise render clean node.
+  - Falloff ratio $t = \text{clamp}\left(\frac{|\Delta\text{ms}| - \text{Tolerance}}{\text{MaxErrorMs} - \text{Tolerance}}, 0.0, 1.0\right)$.
     - **Rush ($\Delta\text{ms} < 0$):** Instantly turns **Yellow (`#FFEA00`)** at $t=0.0$ $\rightarrow$ Orange (`#FF9100`) $\rightarrow$ Electric Red (`#FF1744`) as $t \rightarrow 1.0$.
     - **Drag ($\Delta\text{ms} > 0$):** Instantly turns **Cyan (`#00E5FF`)** at $t=0.0$ $\rightarrow$ Deep Blue (`#2979FF`) $\rightarrow$ Vivid Purple (`#D500F9`) as $t \rightarrow 1.0$.
 

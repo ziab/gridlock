@@ -116,6 +116,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
         true
     ));
 
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ "show_velocity_labels", 1 },
+        "Display Velocity",
+        false
+    ));
+
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{ "note_filter", 1 },
         "Display Mode",

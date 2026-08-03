@@ -19,7 +19,8 @@ public:
                       double gridSubdivisionPpq,
                       int timeSigNum = 4,
                       bool showMsLabels = true,
-                      float toleranceMs = 10.0f,
+                      bool showVelocityLabels = false,
+                      float toleranceMs = 20.0f,
                       float latencyOffsetMs = 0.0f,
                       float bpm = 120.0f);
     void clearEvents();
@@ -38,7 +39,8 @@ private:
     double subdivisionPpq{ 0.25 };
     int timeSigNumerator{ 4 };
     bool displayMsLabels{ true };
-    float toleranceMsVal{ 10.0f };
+    bool displayVelLabels{ false };
+    float toleranceMsVal{ 20.0f };
     float latencyOffsetMsVal{ 0.0f };
     float bpmVal{ 120.0f };
 

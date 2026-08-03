@@ -11,9 +11,9 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     if (auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
     {
         const auto area = display->userArea;
-        const int minW = std::min(960, area.getWidth() / 2);
+        const int minW = std::min(980, area.getWidth() / 2);
         const int minH = std::min(480, area.getHeight() / 2);
-        const int defaultW = std::min(1420, static_cast<int>(area.getWidth() * 0.85));
+        const int defaultW = std::min(1480, static_cast<int>(area.getWidth() * 0.88));
         const int defaultH = std::min(680, static_cast<int>(area.getHeight() * 0.8));
 
         setResizeLimits (minW, minH, area.getWidth(), area.getHeight());
@@ -21,8 +21,8 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     }
     else
     {
-        setResizeLimits (960, 480, 1920, 1080);
-        setSize (1420, 640);
+        setResizeLimits (980, 480, 1920, 1080);
+        setSize (1480, 640);
     }
 
     addAndMakeVisible (gridComponent);
@@ -124,6 +124,13 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     showMsButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xffffffff));
     addAndMakeVisible (showMsButton);
 
+    showVelButton.setClickingTogglesState (true);
+    showVelButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
+    showVelButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffa855f7)); // Purple VEL
+    showVelButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffb0b8c8));
+    showVelButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xffffffff));
+    addAndMakeVisible (showVelButton);
+
     clearButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
     clearButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffffffff));
     addAndMakeVisible (clearButton);
@@ -148,6 +155,7 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     clickEnabledAttachment= std::make_unique<ButtonAttachment>  (apvts, "click_enabled",       clickToggleButton);
     pauseAttachment       = std::make_unique<ButtonAttachment>  (apvts, "is_paused",           pauseButton);
     showMsAttachment      = std::make_unique<ButtonAttachment>  (apvts, "show_ms_labels",      showMsButton);
+    showVelAttachment     = std::make_unique<ButtonAttachment>  (apvts, "show_velocity_labels",showVelButton);
 
     // Custom time signature combo box handler mapping to time_sig_num
     timeSigComboBox.onChange = [this, &apvts]() {
@@ -241,11 +249,12 @@ void MidiGridAnalyzerAudioProcessorEditor::timerCallback()
     const double subdivisionPpq = MidiGridAnalyzerAudioProcessor::getSubdivisionPpq (subIdx);
     const int timeSigNum = processorRef.getCurrentTimeSigNum();
     const bool showMsVal = (processorRef.getAPVTS().getRawParameterValue("show_ms_labels")->load() > 0.5f);
+    const bool showVelVal = (processorRef.getAPVTS().getRawParameterValue("show_velocity_labels")->load() > 0.5f);
     const float toleranceVal = processorRef.getAPVTS().getRawParameterValue("tolerance_ms")->load();
     const float latencyVal = processorRef.getAPVTS().getRawParameterValue("latency_offset_ms")->load();
     const float bpmVal = static_cast<float>(processorRef.getCurrentBpm());
 
-    gridComponent.updateEvents (eventHistory, currentPpq, barsVal, subdivisionPpq, timeSigNum, showMsVal, toleranceVal, latencyVal, bpmVal);
+    gridComponent.updateEvents (eventHistory, currentPpq, barsVal, subdivisionPpq, timeSigNum, showMsVal, showVelVal, toleranceVal, latencyVal, bpmVal);
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::paint (juce::Graphics& g)
@@ -309,6 +318,9 @@ void MidiGridAnalyzerAudioProcessorEditor::resized()
     x += 69;
 
     showMsButton.setBounds (x, topMargin, 85, controlHeight);
+    x += 89;
+
+    showVelButton.setBounds (x, topMargin, 76, controlHeight);
 
     clearButton.setBounds (getWidth() - 85, topMargin, 78, controlHeight);
 
