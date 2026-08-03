@@ -137,11 +137,14 @@ struct HitEvent {
 
 ---
 
-### 4.4 Test Mode Latency Compensation Rules
+### 4.4 Test Mode Latency & Error Distribution Rules
 * **Synthesized Test Hits**:
   - Target Compensated Position: `compPpq = tick + devPpq`.
   - Stored Raw Position: `rawHitPpqPosition = compPpq + totalLatencyPpq`.
-  - Ensures live GUI latency compensation rendering cancels out `totalLatencyPpq` perfectly, rendering test hits at their exact intended timing error (0ms kick, +14ms snare, etc.) regardless of slider latency adjustments.
+  - **Error Distribution (20% Out-of-Tolerance)**:
+    - **80% On-Grid (Green `✓`)**: Timing deviation within $\pm(0.1 \dots 0.7) \times \text{Tolerance}$.
+    - **10% Rush (Yellow/Orange/Red)**: Timing deviation $-\text{Tolerance} \times (1.2 \dots 2.2)$.
+    - **10% Drag (Cyan/Blue/Purple)**: Timing deviation $+\text{Tolerance} \times (1.2 \dots 2.2)$.
 
 ---
 
