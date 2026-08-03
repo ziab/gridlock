@@ -104,10 +104,11 @@ struct HitEvent {
    * High-quality sample buffers for Downbeat (High), Beat (Mid), and Subdivision (Low) clicks.
    * Trigger sample playback accurately at sample-exact offsets in `processBlock` based on BPM, Time Signature, and Click Subdivision settings.
 3. **MIDI Pass-Through & Crosstalk Filtering:** Pass MIDI through with zero latency while discarding Note-On events with `velocity < min_velocity`.
-4. **Sub-block Timing Precision & Latency Compensation:**
-   * Automatically query hardware audio output latency (`getOutputLatency()`) and add user manual offset (`latency_offset_ms`).
-   * Compensate both the visual PPQ node position (`event.hitPpqPosition`) and the millisecond error (`event.deltaMs`) so hits shift visually on the grid to align with grid lines.
-   * Compute `normalizedDeviation = std::clamp(deltaMs / toleranceMs, -1.0f, 1.0f)`.
+4. **Sub-block Timing Precision & Live Real-Time Latency Compensation:**
+   * Query total latency (`autoLatencyMs` + `latency_offset_ms`).
+   * Store `rawHitPpqPosition` on each `HitEvent`.
+   * Dynamically calculate `compensatedHitPpq`, `deltaMs`, `normalizedDeviation`, and color gradients in real time during canvas rendering (`GridComponent::paint`).
+   * Dragging the `Latency` or `Tolerance` sliders instantly shifts and updates all visible notes on the grid in real time.
 5. **Lock-Free Push:** Push `HitEvent` to `RingBuffer` for GUI rendering.
 
 ---

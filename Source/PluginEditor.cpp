@@ -241,8 +241,11 @@ void MidiGridAnalyzerAudioProcessorEditor::timerCallback()
     const double subdivisionPpq = MidiGridAnalyzerAudioProcessor::getSubdivisionPpq (subIdx);
     const int timeSigNum = processorRef.getCurrentTimeSigNum();
     const bool showMsVal = (processorRef.getAPVTS().getRawParameterValue("show_ms_labels")->load() > 0.5f);
+    const float toleranceVal = processorRef.getAPVTS().getRawParameterValue("tolerance_ms")->load();
+    const float latencyVal = processorRef.getAPVTS().getRawParameterValue("latency_offset_ms")->load();
+    const float bpmVal = static_cast<float>(processorRef.getCurrentBpm());
 
-    gridComponent.updateEvents (eventHistory, currentPpq, barsVal, subdivisionPpq, timeSigNum, showMsVal);
+    gridComponent.updateEvents (eventHistory, currentPpq, barsVal, subdivisionPpq, timeSigNum, showMsVal, toleranceVal, latencyVal, bpmVal);
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::paint (juce::Graphics& g)

@@ -271,6 +271,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
             HitEvent event;
             event.noteNumber = static_cast<uint8_t>(msg.getNoteNumber());
             event.velocity = static_cast<uint8_t>(msg.getVelocity());
+            event.rawHitPpqPosition = rawHitPpq;
             event.hitPpqPosition = compensatedHitPpq;
             event.deltaMs = deltaMs;
             event.normalizedDeviation = normalizedDev;

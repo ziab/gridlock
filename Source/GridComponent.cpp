@@ -73,7 +73,10 @@ void GridComponent::updateEvents(const std::vector<HitEvent>& events,
                                  int numBars,
                                  double gridSubdivisionPpq,
                                  int timeSigNum,
-                                 bool showMsLabels)
+                                 bool showMsLabels,
+                                 float toleranceMs,
+                                 float latencyOffsetMs,
+                                 float bpm)
 {
     activeEvents = events;
     currentPpqPos = currentPpq;
@@ -81,6 +84,9 @@ void GridComponent::updateEvents(const std::vector<HitEvent>& events,
     subdivisionPpq = (gridSubdivisionPpq > 0.0) ? gridSubdivisionPpq : 0.25;
     timeSigNumerator = (timeSigNum > 0) ? timeSigNum : 4;
     displayMsLabels = showMsLabels;
+    toleranceMsVal = (toleranceMs > 0.0f) ? toleranceMs : 10.0f;
+    latencyOffsetMsVal = latencyOffsetMs;
+    bpmVal = (bpm > 0.0f) ? bpm : 120.0f;
     repaint();
 }
 
@@ -219,23 +225,33 @@ void GridComponent::paint(juce::Graphics& g)
         }
     }
 
-    // Render Hit Events with Continuous Dynamic Color Gradient
+    // Render Hit Events with Live Real-Time Latency & Tolerance Recalculation
+    const double userLatencyPpq = (static_cast<double>(latencyOffsetMsVal) / 1000.0) * (static_cast<double>(bpmVal) / 60.0);
     const float nodeRadius = 11.0f; // High visibility hit nodes
 
     for (const auto& event : activeEvents)
     {
-        if (event.hitPpqPosition < minPpq || event.hitPpqPosition > maxPpq)
+        const double rawPpq = (event.rawHitPpqPosition > 0.0) ? event.rawHitPpqPosition : event.hitPpqPosition;
+        const double compPpq = rawPpq - userLatencyPpq;
+
+        if (compPpq < minPpq || compPpq > maxPpq)
             continue;
 
         const int laneIndex = getLaneIndexForNote(event.noteNumber);
         if (laneIndex < 0 || laneIndex >= numLanes) continue;
 
-        const float normalizedX = static_cast<float>((event.hitPpqPosition - minPpq) / totalPpqWindow);
+        // Recalculate Delta MS and Normalized Deviation live for all displayed notes
+        const double nearestGridPpq = std::round(compPpq / subdivisionPpq) * subdivisionPpq;
+        const double deltaPpq = compPpq - nearestGridPpq;
+        const double liveDeltaMs = (deltaPpq / (static_cast<double>(bpmVal) / 60.0)) * 1000.0;
+        const float liveNormDev = std::clamp(static_cast<float>(liveDeltaMs / static_cast<double>(toleranceMsVal)), -1.0f, 1.0f);
+
+        const float normalizedX = static_cast<float>((compPpq - minPpq) / totalPpqWindow);
         const float hitX = canvasLeft + (normalizedX * canvasWidth);
         const float hitY = laneAreaTop + (laneIndex * laneHeight) + (laneHeight * 0.5f);
 
-        // Continuous Dynamic Color Interpolation
-        const juce::Colour fillColour = getContinuousHitColor(event.normalizedDeviation);
+        // Continuous Dynamic Color Interpolation based on live normalized deviation
+        const juce::Colour fillColour = getContinuousHitColor(liveNormDev);
 
         const auto hitRect = juce::Rectangle<float>(hitX - nodeRadius, hitY - nodeRadius, nodeRadius * 2.0f, nodeRadius * 2.0f);
 
@@ -255,8 +271,8 @@ void GridComponent::paint(juce::Graphics& g)
         // Display MS Offset Label underneath note if enabled
         if (displayMsLabels)
         {
-            juce::String msText = juce::String(static_cast<int>(std::round(event.deltaMs))) + "ms";
-            if (event.deltaMs > 0) msText = "+" + msText;
+            juce::String msText = juce::String(static_cast<int>(std::round(liveDeltaMs))) + "ms";
+            if (liveDeltaMs > 0.0) msText = "+" + msText;
 
             const float labelW = 44.0f;
             const float labelH = 14.0f;

@@ -18,7 +18,10 @@ public:
                       int numBars,
                       double gridSubdivisionPpq,
                       int timeSigNum = 4,
-                      bool showMsLabels = true);
+                      bool showMsLabels = true,
+                      float toleranceMs = 10.0f,
+                      float latencyOffsetMs = 0.0f,
+                      float bpm = 120.0f);
     void clearEvents();
 
     static juce::Colour getContinuousHitColor(float normalizedDeviation) noexcept;
@@ -35,6 +38,9 @@ private:
     double subdivisionPpq{ 0.25 };
     int timeSigNumerator{ 4 };
     bool displayMsLabels{ true };
+    float toleranceMsVal{ 10.0f };
+    float latencyOffsetMsVal{ 0.0f };
+    float bpmVal{ 120.0f };
 
     std::vector<DrumLaneInfo> drumLanes;
     int getLaneIndexForNote(uint8_t note) const noexcept;
