@@ -274,18 +274,23 @@ void GridComponent::paint(juce::Graphics& g)
         g.setColour(fillColour);
         g.fillEllipse(hitRect);
 
-        // Draw Checkmark '✓' inside node for hits within tolerance; draw Velocity only if enabled
-        g.setColour(juce::Colour(0xff000000));
-
+        // Draw Checkmark vector path inside node for hits within tolerance; draw Velocity only if enabled
         if (absDelta <= toleranceMsVal)
         {
-            g.setFont(juce::Font(13.0f, juce::Font::bold));
-            g.drawText(juce::String(juce::CharPointer_UTF8("\xe2\x9c\x93")), hitRect, juce::Justification::centred, false);
+            juce::Path checkPath;
+            const float r = nodeRadius * 0.55f;
+            checkPath.startNewSubPath (hitX - r * 0.55f, hitY + r * 0.05f);
+            checkPath.lineTo (hitX - r * 0.10f, hitY + r * 0.55f);
+            checkPath.lineTo (hitX + r * 0.65f, hitY - r * 0.45f);
+
+            g.setColour (juce::Colour (0xff0a0c10));
+            g.strokePath (checkPath, juce::PathStrokeType (2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
         else if (displayVelLabels)
         {
-            g.setFont(juce::Font(10.0f, juce::Font::bold));
-            g.drawText(juce::String(event.velocity), hitRect, juce::Justification::centred, false);
+            g.setColour (juce::Colour (0xff000000));
+            g.setFont (juce::Font (10.0f, juce::Font::bold));
+            g.drawText (juce::String (event.velocity), hitRect, juce::Justification::centred, false);
         }
 
         // Display MS Offset Label underneath note if enabled
