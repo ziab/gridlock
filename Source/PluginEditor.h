@@ -14,6 +14,7 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void parentHierarchyChanged() override;
 
 private:
     void timerCallback() override;
@@ -34,7 +35,6 @@ private:
     juce::Slider clickVolumeSlider;
     juce::Slider clickPanSlider;
     juce::TextButton clickToggleButton{ "CLICK ON" };
-    juce::TextButton fullscreenButton{ "FULL SCREEN" };
     juce::TextButton clearButton{ "Clear Grid" };
 
     // Labels
