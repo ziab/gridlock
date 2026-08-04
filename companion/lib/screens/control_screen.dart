@@ -503,6 +503,11 @@ class _ControlScreenState extends State<ControlScreen>
                       ),
                     ),
                     const SizedBox(height: 14),
+                    _buildHistoryBarsControl(
+                      connection,
+                      connection.parameters['bars_window'],
+                    ),
+                    const SizedBox(height: 14),
                     _buildToleranceControl(
                       connection,
                       connection.parameters['tolerance_ms'],
@@ -514,6 +519,99 @@ class _ControlScreenState extends State<ControlScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildHistoryBarsControl(
+    ConnectionService connection,
+    dynamic barsWindow,
+  ) {
+    final currentIndex = (barsWindow?.value ?? 2.0).round();
+    const options = ['1 Bar', '2 Bars', '4 Bars', '8 Bars'];
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'HISTORY BARS',
+          style: TextStyle(
+            color: Color(0xFF8b92a8),
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 2.5,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0f1118),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFF2d3245), width: 1.5),
+          ),
+          padding: const EdgeInsets.all(4),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(options.length, (i) {
+                final isActive = i == currentIndex;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      connection.setParameter('bars_window', i.toDouble());
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? const Color(0xFFA855F7).withValues(alpha: 0.15)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isActive
+                              ? const Color(0xFFA855F7).withValues(alpha: 0.5)
+                              : Colors.transparent,
+                          width: 1.5,
+                        ),
+                        boxShadow: isActive
+                            ? [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFFA855F7,
+                                  ).withValues(alpha: 0.15),
+                                  blurRadius: 12,
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Text(
+                        options[i],
+                        style: TextStyle(
+                          color: isActive
+                              ? const Color(0xFFA855F7)
+                              : const Color(0xFF6b7280),
+                          fontSize: 16,
+                          fontWeight: isActive
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

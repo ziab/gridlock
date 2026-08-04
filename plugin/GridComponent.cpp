@@ -395,7 +395,7 @@ void GridComponent::paint (juce::Graphics &g)
         (totalVisibleHits > 0)
             ? static_cast<int> (std::round (
                   (static_cast<double> (greenVisibleHits) / static_cast<double> (totalVisibleHits)) * 100.0))
-            : 100;
+            : 0;
 
     // Sidebar Score Title
     g.setColour (juce::Colour (0xff94a3b8));

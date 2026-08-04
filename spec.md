@@ -160,7 +160,7 @@ struct HitEvent {
 ### 4.5 Rolling Window Accuracy Score Bar (`GridComponent.cpp`)
 * **Accuracy Percentage Calculation**:
   - Evaluated continuously over all visible notes in active history window (`barsWindow`).
-  - $\text{Accuracy\%} = \frac{N_{\text{green}}}{N_{\text{total}}} \times 100\%$ ($100\%$ if $N_{\text{total}} = 0$).
+  - $\text{Accuracy\%} = \frac{N_{\text{green}}}{N_{\text{total}}} \times 100\%$ ($0\%$ if $N_{\text{total}} = 0$).
 * **UI Score Footer**:
   - High-contrast bottom progress bar with Emerald Green fill (`#00FF88`).
   - Bold text readout: `ACCURACY: 88% (22 / 25 Notes On-Grid)`.
