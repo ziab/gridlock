@@ -114,6 +114,7 @@ class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor
     std::unique_ptr<RemoteControlServer> remoteServer;
 
     double lastTestBeatTick{-1.0};
+    double lastOtherHiHatTimeMs{-100000.0};
     juce::Random random;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiGridAnalyzerAudioProcessor)

@@ -243,6 +243,23 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
         if (msg.isNoteOn () && msg.getVelocity () >= minVelocity &&
             !DrumMap::isExcluded (static_cast<uint8_t> (msg.getNoteNumber ())))
         {
+            const uint8_t noteNum = static_cast<uint8_t> (msg.getNoteNumber ());
+            const double nowMs = juce::Time::getMillisecondCounterHiRes ();
+
+            const bool isOtherHiHat = (noteNum == DrumMap::ClosedHiHatEdge || noteNum == DrumMap::ClosedHiHat ||
+                                       noteNum == DrumMap::PedalHiHat || noteNum == DrumMap::OpenHiHatEdge);
+
+            if (isOtherHiHat)
+            {
+                lastOtherHiHatTimeMs = nowMs;
+            }
+            else if (noteNum == DrumMap::OpenHiHat)
+            {
+                // Ignore secondary Note 46 re-trigger if it arrives within 70ms of another hi-hat strike
+                if ((nowMs - lastOtherHiHatTimeMs) < 70.0)
+                    continue;
+            }
+
             const int sampleOffset = metadata.samplePosition;
             const double rawHitPpq = currentPpqPosition + (sampleOffset * (currentBpm / 60.0) / srToUse);
 
