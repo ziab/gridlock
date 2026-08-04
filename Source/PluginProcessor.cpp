@@ -278,7 +278,8 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buf
     {
         const auto msg = metadata.getMessage();
 
-        if (msg.isNoteOn() && msg.getVelocity() >= minVelocity)
+        if (msg.isNoteOn() && msg.getVelocity() >= minVelocity
+            && !DrumMap::isExcluded(static_cast<uint8_t>(msg.getNoteNumber())))
         {
             const int sampleOffset = metadata.samplePosition;
             const double rawHitPpq = currentPpqPosition + (sampleOffset * (currentBpm / 60.0) / srToUse);
