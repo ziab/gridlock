@@ -49,14 +49,10 @@ struct LaneInfo
     std::vector<uint8_t> notes;
 };
 
-// Notes to exclude entirely from the grid display
-// OpenHiHat (46) = pedal-release foot motion, not a struck note - always appears off-grid
+// Notes to exclude entirely from the grid display (currently no notes excluded)
 inline bool isExcluded (uint8_t note) noexcept
 {
-    constexpr uint8_t excluded[] = {OpenHiHat};
-    for (auto n : excluded)
-        if (n == note)
-            return true;
+    juce::ignoreUnused (note);
     return false;
 }
 
