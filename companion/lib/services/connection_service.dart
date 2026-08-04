@@ -29,7 +29,10 @@ class ConnectionService extends ChangeNotifier {
     disconnect();
 
     try {
-      final cleanIp = ip.replaceAll(RegExp(r'^https?://|^ws://'), '').split('/')[0].split(':')[0];
+      final cleanIp = ip
+          .replaceAll(RegExp(r'^https?://|^ws://'), '')
+          .split('/')[0]
+          .split(':')[0];
       final uri = Uri.parse('ws://$cleanIp:$port');
       _channel = WebSocketChannel.connect(uri);
       await _channel!.ready;
