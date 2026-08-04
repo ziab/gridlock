@@ -518,8 +518,9 @@ class _ControlScreenState extends State<ControlScreen>
     dynamic tolerance,
   ) {
     final val = (tolerance?.value ?? 20.0).toDouble();
-    final minVal = (tolerance?.min ?? 0.0).toDouble();
-    final maxVal = (tolerance?.max ?? 100.0).toDouble();
+    final minVal = (tolerance?.min ?? 5.0).toDouble();
+    final maxVal = (tolerance?.max ?? 30.0).toDouble();
+    final divisions = ((maxVal - minVal) * 2).round();
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -563,7 +564,7 @@ class _ControlScreenState extends State<ControlScreen>
               value: val.clamp(minVal, maxVal),
               min: minVal,
               max: maxVal,
-              divisions: 200,
+              divisions: divisions > 0 ? divisions : 50,
               onChanged: (v) {
                 HapticFeedback.selectionClick();
                 connection.setParameter('tolerance_ms', (v * 2).round() / 2);
@@ -756,7 +757,6 @@ class _ControlScreenState extends State<ControlScreen>
               _SecondaryDef('click_sample_preset', 'Click Sound Preset'),
               _SecondaryDef('bars_window', 'History Bars'),
               _SecondaryDef('subdivision', 'Grid Subdivision'),
-              _SecondaryDef('tolerance_ms', 'Timing Tolerance', suffix: ' ms'),
               _SecondaryDef(
                 'latency_offset_ms',
                 'System Latency',
