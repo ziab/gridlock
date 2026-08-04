@@ -8,10 +8,7 @@ import '../widgets/signature_picker.dart';
 import '../widgets/subdivision_picker.dart';
 import '../widgets/parameter_card.dart';
 
-/// Main control screen — the single-screen UI of the companion app.
-///
-/// Top section: BPM dial, time signature, click subdivision (primary)
-/// Bottom section: scrollable grid of secondary parameter cards
+/// Main control screen — focused single-screen UI for the drum throne.
 class ControlScreen extends StatefulWidget {
   const ControlScreen({super.key});
 
@@ -98,7 +95,6 @@ class _ControlScreenState extends State<ControlScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Animated logo/icon
               AnimatedBuilder(
                 animation: _pulseController,
                 builder: (context, child) {
@@ -345,7 +341,7 @@ class _ControlScreenState extends State<ControlScreen>
     }
   }
 
-  // ── Control View ────────────────────────────────────────────────
+  // ── Main Control View ───────────────────────────────────────────
   Widget _buildControlView(ConnectionService connection) {
     final params = connection.parameters;
 
@@ -358,23 +354,16 @@ class _ControlScreenState extends State<ControlScreen>
       body: SafeArea(
         child: Column(
           children: [
+            // Status bar
             _buildStatusBar(connection),
 
+            // Main Drum Throne Controls
             Expanded(
-              flex: 5,
               child: _buildPrimaryControls(connection, bpm, timeSig, clickSub),
             ),
 
-            Container(
-              height: 1,
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              color: const Color(0xFF2d3245),
-            ),
-
-            Expanded(
-              flex: 4,
-              child: _buildSecondaryControls(connection, params),
-            ),
+            // Quick Actions & Options Footer
+            _buildFooterActions(connection, params),
           ],
         ),
       ),
@@ -437,7 +426,15 @@ class _ControlScreenState extends State<ControlScreen>
               );
             },
           ),
-          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Options',
+            icon: const Icon(
+              Icons.tune_rounded,
+              color: Color(0xFF38bdf8),
+              size: 18,
+            ),
+            onPressed: () => _showOptionsModal(context, connection),
+          ),
           GestureDetector(
             onTap: () {
               connection.disconnect();
@@ -472,26 +469,28 @@ class _ControlScreenState extends State<ControlScreen>
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 8,
+                  vertical: 12,
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     BpmDial(
-                      value: bpm?.value ?? 120.0,
+                      value: (bpm?.value ?? 120.0).roundToDouble(),
                       min: bpm?.min ?? 40.0,
                       max: bpm?.max ?? 300.0,
-                      step: bpm?.step ?? 0.1,
-                      onChanged: (v) =>
-                          connection.setParameter('internal_bpm', v),
+                      step: 1.0,
+                      onChanged: (v) => connection.setParameter(
+                        'internal_bpm',
+                        v.roundToDouble(),
+                      ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     SignaturePicker(
                       currentNumerator: (timeSig?.value ?? 4.0).round(),
                       onChanged: (n) =>
                           connection.setParameter('time_sig_num', n.toDouble()),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     SubdivisionPicker(
                       currentIndex: (clickSub?.value ?? 1.0).round(),
                       onChanged: (i) => connection.setParameter(
@@ -509,59 +508,289 @@ class _ControlScreenState extends State<ControlScreen>
     );
   }
 
-  Widget _buildSecondaryControls(
+  Widget _buildFooterActions(
     ConnectionService connection,
     Map<String, dynamic> params,
   ) {
-    // Define which params to show and their display config
-    // Excluded: show_velocity_labels, show_note_numbers, test_mode (UI-only)
-    final secondaryParams = <_SecondaryDef>[
-      _SecondaryDef('click_enabled', 'Metronome'),
-      _SecondaryDef('is_paused', 'Pause'),
-      _SecondaryDef('click_volume', 'Click Volume'),
-      _SecondaryDef('click_pan', 'Click Pan'),
-      _SecondaryDef('click_sample_preset', 'Click Sound'),
-      _SecondaryDef('bars_window', 'History Bars'),
-      _SecondaryDef('subdivision', 'Grid Subdiv'),
-      _SecondaryDef('tolerance_ms', 'Tolerance', suffix: ' ms'),
-      _SecondaryDef('latency_offset_ms', 'Latency', suffix: ' ms'),
-      _SecondaryDef('min_velocity', 'Min Velocity'),
-      _SecondaryDef('show_ms_labels', 'MS Offsets'),
-      _SecondaryDef('note_filter', 'Display Mode'),
-    ];
+    final clickEnabled = params['click_enabled'];
+    final isPaused = params['is_paused'];
 
-    final available = secondaryParams
-        .where((def) => params.containsKey(def.id))
-        .toList();
+    final clickOn = (clickEnabled?.value ?? 1.0) > 0.5;
+    final pausedOn = (isPaused?.value ?? 0.0) > 0.5;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-      child: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 2.0,
-        ),
-        itemCount: available.length,
-        itemBuilder: (context, index) {
-          final def = available[index];
-          final param = params[def.id];
-          if (param == null) return const SizedBox();
-
-          return ParameterCard(
-            label: def.displayName,
-            paramType: param.paramType,
-            value: param.value,
-            min: param.min,
-            max: param.max,
-            step: param.step > 0 ? param.step : 0.01,
-            options: param.options,
-            suffix: def.suffix,
-            onChanged: (v) => connection.setParameter(def.id, v),
-          );
-        },
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF141722),
+        border: Border(top: BorderSide(color: Color(0xFF252a3a), width: 1)),
       ),
+      child: Row(
+        children: [
+          // Metronome Quick Toggle
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                connection.setParameter('click_enabled', clickOn ? 0.0 : 1.0);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: clickOn
+                      ? const Color(0xFF00c853).withValues(alpha: 0.2)
+                      : const Color(0xFF1e2235),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: clickOn
+                        ? const Color(0xFF00c853).withValues(alpha: 0.6)
+                        : const Color(0xFF2d3245),
+                    width: 1.5,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      clickOn
+                          ? Icons.volume_up_rounded
+                          : Icons.volume_off_rounded,
+                      color: clickOn
+                          ? const Color(0xFF00c853)
+                          : const Color(0xFF6b7280),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      clickOn ? 'METRONOME ON' : 'METRONOME OFF',
+                      style: TextStyle(
+                        color: clickOn
+                            ? const Color(0xFF00c853)
+                            : const Color(0xFF6b7280),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // Pause Quick Toggle
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                connection.setParameter('is_paused', pausedOn ? 0.0 : 1.0);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: pausedOn
+                      ? const Color(0xFFFF1744).withValues(alpha: 0.2)
+                      : const Color(0xFF1e2235),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: pausedOn
+                        ? const Color(0xFFFF1744).withValues(alpha: 0.6)
+                        : const Color(0xFF2d3245),
+                    width: 1.5,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      pausedOn
+                          ? Icons.pause_circle_filled
+                          : Icons.play_arrow_rounded,
+                      color: pausedOn
+                          ? const Color(0xFFFF1744)
+                          : const Color(0xFF8b92a8),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      pausedOn ? 'PAUSED' : 'RUNNING',
+                      style: TextStyle(
+                        color: pausedOn
+                            ? const Color(0xFFFF1744)
+                            : const Color(0xFF8b92a8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // All Parameters Options Drawer Button
+          GestureDetector(
+            onTap: () => _showOptionsModal(context, connection),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF38bdf8).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF38bdf8).withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.tune_rounded, color: Color(0xFF38bdf8), size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    'OPTIONS',
+                    style: TextStyle(
+                      color: Color(0xFF38bdf8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Options / All Parameters Bottom Sheet ───────────────────────
+  void _showOptionsModal(BuildContext context, ConnectionService connection) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0a0c10),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Consumer<ConnectionService>(
+          builder: (context, conn, _) {
+            final params = conn.parameters;
+
+            final secondaryParams = <_SecondaryDef>[
+              _SecondaryDef('click_volume', 'Click Volume'),
+              _SecondaryDef('click_pan', 'Click Panning'),
+              _SecondaryDef('click_sample_preset', 'Click Sound Preset'),
+              _SecondaryDef('bars_window', 'History Bars'),
+              _SecondaryDef('subdivision', 'Grid Subdivision'),
+              _SecondaryDef('tolerance_ms', 'Timing Tolerance', suffix: ' ms'),
+              _SecondaryDef(
+                'latency_offset_ms',
+                'System Latency',
+                suffix: ' ms',
+              ),
+              _SecondaryDef('min_velocity', 'Min Velocity'),
+              _SecondaryDef('show_ms_labels', 'Display MS Offsets'),
+              _SecondaryDef('note_filter', 'Display Mode'),
+            ];
+
+            final available = secondaryParams
+                .where((def) => params.containsKey(def.id))
+                .toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.4,
+              maxChildSize: 0.92,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    // Handle & Header
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2d3245),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 4,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.tune_rounded,
+                            color: Color(0xFF38bdf8),
+                            size: 20,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'GRIDLOCK OPTIONS',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(color: Color(0xFF252a3a), height: 20),
+
+                    // Scrollable Parameters Grid
+                    Expanded(
+                      child: GridView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 10,
+                              crossAxisSpacing: 10,
+                              childAspectRatio: 1.8,
+                            ),
+                        itemCount: available.length,
+                        itemBuilder: (context, index) {
+                          final def = available[index];
+                          final param = params[def.id];
+                          if (param == null) return const SizedBox();
+
+                          return ParameterCard(
+                            label: def.displayName,
+                            paramType: param.paramType,
+                            value: param.value,
+                            min: param.min,
+                            max: param.max,
+                            step: param.step > 0 ? param.step : 0.01,
+                            options: param.options,
+                            suffix: def.suffix,
+                            onChanged: (v) => conn.setParameter(def.id, v),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 }

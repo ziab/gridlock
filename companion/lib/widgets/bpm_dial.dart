@@ -18,7 +18,7 @@ class BpmDial extends StatefulWidget {
     required this.value,
     this.min = 40.0,
     this.max = 300.0,
-    this.step = 0.1,
+    this.step = 1.0,
     required this.onChanged,
   });
 
@@ -60,8 +60,8 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
       widget.min,
       widget.max,
     );
-    final snapped = (newValue / widget.step).round() * widget.step;
-    if ((snapped - widget.value).abs() >= widget.step * 0.5) {
+    final snapped = newValue.roundToDouble();
+    if ((snapped - widget.value).abs() >= 1.0) {
       widget.onChanged(snapped);
       HapticFeedback.selectionClick();
     }
@@ -69,7 +69,7 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
 
   void _onTap() async {
     final controller = TextEditingController(
-      text: widget.value.toStringAsFixed(1),
+      text: widget.value.round().toString(),
     );
     final result = await showDialog<double>(
       context: context,
@@ -78,10 +78,10 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
         title: const Text('Set BPM', style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          keyboardType: TextInputType.number,
           autofocus: true,
           style: const TextStyle(color: Colors.white, fontSize: 24),
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             enabledBorder: OutlineInputBorder(
               borderSide: BorderSide(color: Colors.white24),
             ),
@@ -91,7 +91,9 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
           ),
           onSubmitted: (v) {
             final parsed = double.tryParse(v);
-            if (parsed != null) Navigator.pop(context, parsed);
+            if (parsed != null) {
+              Navigator.pop(context, parsed.roundToDouble());
+            }
           },
         ),
         actions: [
@@ -105,7 +107,9 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
           TextButton(
             onPressed: () {
               final parsed = double.tryParse(controller.text);
-              if (parsed != null) Navigator.pop(context, parsed);
+              if (parsed != null) {
+                Navigator.pop(context, parsed.roundToDouble());
+              }
             },
             child: const Text(
               'Set',
@@ -116,7 +120,7 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
       ),
     );
     if (result != null) {
-      widget.onChanged(result.clamp(widget.min, widget.max));
+      widget.onChanged(result.clamp(widget.min, widget.max).roundToDouble());
     }
   }
 
@@ -166,7 +170,7 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    widget.value.toStringAsFixed(1),
+                    widget.value.round().toString(),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 36,
