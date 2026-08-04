@@ -92,6 +92,12 @@ class ConnectionService extends ChangeNotifier {
     setParameter(id, param.boolValue ? 0.0 : 1.0);
   }
 
+  /// Request clearing the hit grid.
+  void clearGrid() {
+    if (!_connected || _channel == null) return;
+    _channel!.sink.add(jsonEncode({'type': 'clear_grid'}));
+  }
+
   /// Request a full state refresh.
   void requestFullState() {
     if (!_connected || _channel == null) return;

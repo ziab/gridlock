@@ -17,7 +17,7 @@ public:
     void run() override
     {
         juce::DatagramSocket udpSocket;
-        udpSocket.bindToPort (udpPort);
+        udpSocket.bindToPort (udpPort, "0.0.0.0");
 
         while (! threadShouldExit())
         {
@@ -243,14 +243,14 @@ bool RemoteControlServer::performWebSocketHandshake (juce::StreamingSocket& clie
 
     juce::String request (buf, static_cast<size_t> (totalRead));
 
-    if (! request.contains ("Upgrade: websocket"))
+    if (! request.containsIgnoreCase ("Upgrade: websocket"))
         return false;
 
     // Extract Sec-WebSocket-Key
     juce::String key;
     for (auto line : juce::StringArray::fromLines (request))
     {
-        if (line.startsWith ("Sec-WebSocket-Key:"))
+        if (line.trim().startsWithIgnoreCase ("Sec-WebSocket-Key:"))
         {
             key = line.fromFirstOccurrenceOf (":", false, false).trim();
             break;
@@ -357,7 +357,7 @@ bool RemoteControlServer::performWebSocketHandshake (juce::StreamingSocket& clie
 juce::String RemoteControlServer::readWebSocketTextFrame (juce::StreamingSocket& client)
 {
     uint8_t header[2];
-    if (client.read (header, 2, true) != 2)
+    if (client.read (header, 2, false) != 2)
         return {};
 
     const uint8_t opcode = header[0] & 0x0F;
@@ -374,11 +374,10 @@ juce::String RemoteControlServer::readWebSocketTextFrame (juce::StreamingSocket&
     // Pong in response to ping
     if (opcode == 0x09)
     {
-        // Read and discard ping payload, send pong
         if (payloadLen > 0 && payloadLen < 126)
         {
             std::vector<uint8_t> pingData (payloadLen);
-            client.read (pingData.data(), static_cast<int> (payloadLen), true);
+            client.read (pingData.data(), static_cast<int> (payloadLen), false);
         }
         uint8_t pong[2] = { 0x8A, 0x00 }; // FIN + Pong, 0 length
         client.write (pong, 2);
@@ -391,13 +390,13 @@ juce::String RemoteControlServer::readWebSocketTextFrame (juce::StreamingSocket&
     if (payloadLen == 126)
     {
         uint8_t ext[2];
-        if (client.read (ext, 2, true) != 2) return {};
+        if (client.read (ext, 2, false) != 2) return {};
         payloadLen = (static_cast<uint64_t> (ext[0]) << 8) | ext[1];
     }
     else if (payloadLen == 127)
     {
         uint8_t ext[8];
-        if (client.read (ext, 8, true) != 8) return {};
+        if (client.read (ext, 8, false) != 8) return {};
         payloadLen = 0;
         for (int i = 0; i < 8; ++i)
             payloadLen = (payloadLen << 8) | ext[i];
@@ -406,7 +405,7 @@ juce::String RemoteControlServer::readWebSocketTextFrame (juce::StreamingSocket&
     uint8_t maskKey[4] = {};
     if (masked)
     {
-        if (client.read (maskKey, 4, true) != 4) return {};
+        if (client.read (maskKey, 4, false) != 4) return {};
     }
 
     if (payloadLen > 65536) // Safety limit
@@ -415,14 +414,25 @@ juce::String RemoteControlServer::readWebSocketTextFrame (juce::StreamingSocket&
     std::vector<uint8_t> payload (static_cast<size_t> (payloadLen));
     int remaining = static_cast<int> (payloadLen);
     int offset = 0;
+    int retries = 0;
 
-    while (remaining > 0)
+    while (remaining > 0 && retries < 10)
     {
-        int n = client.read (payload.data() + offset, remaining, true);
-        if (n <= 0) return {};
-        offset += n;
-        remaining -= n;
+        int n = client.read (payload.data() + offset, remaining, false);
+        if (n > 0)
+        {
+            offset += n;
+            remaining -= n;
+        }
+        else
+        {
+            client.waitUntilReady (true, 5);
+            retries++;
+        }
     }
+
+    if (remaining > 0)
+        return {};
 
     if (masked)
     {
@@ -496,6 +506,8 @@ void RemoteControlServer::handleClientMessage (juce::StreamingSocket& /*client*/
         {
             float normalized = param->convertTo0to1 (static_cast<float> (value));
             param->setValueNotifyingHost (normalized);
+            // Immediately record in lastParamValues to prevent echo loop back to clients
+            lastParamValues[paramId] = normalized;
         }
     }
     else if (type == "get_state")
@@ -509,10 +521,7 @@ void RemoteControlServer::handleClientMessage (juce::StreamingSocket& /*client*/
     }
     else if (type == "clear_grid")
     {
-        // Trigger a clear — we'll use a special approach: toggle a param
-        // The Flutter app can send this to request clearing
-        // For now, this would need to be wired into the editor differently
-        // We'll just broadcast an ack
+        // Acknowledge clear grid request to clients
         broadcastToClients ("{\"type\":\"clear_ack\"}");
     }
 }

@@ -99,6 +99,11 @@ class ParameterCard extends StatelessWidget {
   }
 
   Widget _buildSlider() {
+    final rawDivisions = (step > 0 && max > min) ? ((max - min) / step).round() : 0;
+    final divisions = (paramType == 'int' && rawDivisions > 0 && rawDivisions <= 200)
+        ? rawDivisions
+        : null;
+
     return SliderTheme(
       data: SliderThemeData(
         activeTrackColor: const Color(0xFF00FF88),
@@ -112,7 +117,7 @@ class ParameterCard extends StatelessWidget {
         value: value.clamp(min, max),
         min: min,
         max: max,
-        divisions: step > 0 ? ((max - min) / step).round() : null,
+        divisions: divisions,
         onChanged: (v) {
           HapticFeedback.selectionClick();
           onChanged(v);

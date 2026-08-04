@@ -193,9 +193,17 @@ class _ControlScreenState extends State<ControlScreen>
                   ),
                 ),
                 const SizedBox(height: 20),
-                _buildRetryButton(),
               ],
-              if (!_discovering && _errorMessage == null) _buildRetryButton(),
+              if (!_discovering) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildRetryButton(),
+                    const SizedBox(width: 12),
+                    _buildManualConnectButton(),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -210,7 +218,7 @@ class _ControlScreenState extends State<ControlScreen>
         _startDiscovery();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         decoration: BoxDecoration(
           color: const Color(0xFF00FF88).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
@@ -223,7 +231,7 @@ class _ControlScreenState extends State<ControlScreen>
           'SCAN AGAIN',
           style: TextStyle(
             color: Color(0xFF00FF88),
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
             letterSpacing: 2,
           ),
@@ -232,11 +240,105 @@ class _ControlScreenState extends State<ControlScreen>
     );
   }
 
+  Widget _buildManualConnectButton() {
+    return GestureDetector(
+      onTap: _showManualConnectDialog,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1e2235),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFF38bdf8).withValues(alpha: 0.4),
+            width: 1.5,
+          ),
+        ),
+        child: const Text(
+          'MANUAL IP',
+          style: TextStyle(
+            color: Color(0xFF38bdf8),
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showManualConnectDialog() async {
+    final controller = TextEditingController(text: '127.0.0.1:9876');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1a1d2e),
+        title: const Text('Manual Connection', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter Gridlock PC IP & Port:',
+              style: TextStyle(color: Color(0xFF8b92a8), fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+              decoration: const InputDecoration(
+                hintText: 'e.g. 192.168.1.100:9876',
+                hintStyle: TextStyle(color: Colors.white24),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF38bdf8)),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Connect', style: TextStyle(color: Color(0xFF38bdf8))),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty && mounted) {
+      final parts = result.split(':');
+      final ip = parts[0];
+      final port = parts.length > 1 ? (int.tryParse(parts[1]) ?? 9876) : 9876;
+
+      setState(() {
+        _discovering = true;
+        _errorMessage = null;
+      });
+
+      final connection = context.read<ConnectionService>();
+      final success = await connection.connect(ip, port);
+      if (mounted) {
+        setState(() {
+          _discovering = false;
+          if (!success) {
+            _errorMessage = 'Failed to connect to $ip:$port';
+          }
+        });
+      }
+    }
+  }
+
   // ── Control View ────────────────────────────────────────────────
   Widget _buildControlView(ConnectionService connection) {
     final params = connection.parameters;
 
-    // Extract primary parameter values with safe defaults
     final bpm = params['internal_bpm'];
     final timeSig = params['time_sig_num'];
     final clickSub = params['click_subdivision'];
@@ -246,23 +348,19 @@ class _ControlScreenState extends State<ControlScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // ── Status Bar ──────────────────────────────────────
             _buildStatusBar(connection),
 
-            // ── Primary Controls ────────────────────────────────
             Expanded(
               flex: 5,
               child: _buildPrimaryControls(connection, bpm, timeSig, clickSub),
             ),
 
-            // ── Divider ─────────────────────────────────────────
             Container(
               height: 1,
               margin: const EdgeInsets.symmetric(horizontal: 20),
               color: const Color(0xFF2d3245),
             ),
 
-            // ── Secondary Controls ──────────────────────────────
             Expanded(
               flex: 4,
               child: _buildSecondaryControls(connection, params),
@@ -310,16 +408,21 @@ class _ControlScreenState extends State<ControlScreen>
             ),
           ),
           const Spacer(),
-          const Text(
-            'GRIDLOCK',
-            style: TextStyle(
-              color: Color(0xFF4b5267),
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2,
-            ),
+          IconButton(
+            tooltip: 'Clear Grid',
+            icon: const Icon(Icons.cleaning_services_rounded, color: Color(0xFF00FF88), size: 18),
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              connection.clearGrid();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Grid cleared'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+            },
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           GestureDetector(
             onTap: () {
               connection.disconnect();
@@ -347,7 +450,6 @@ class _ControlScreenState extends State<ControlScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // BPM Dial
           BpmDial(
             value: bpm?.value ?? 120.0,
             min: bpm?.min ?? 40.0,
@@ -356,11 +458,10 @@ class _ControlScreenState extends State<ControlScreen>
             onChanged: (v) => connection.setParameter('internal_bpm', v),
           ),
 
-          // Time Signature
           SignaturePicker(
             currentNumerator: (timeSig?.value ?? 4.0).round(),
-            onChanged: (num) =>
-                connection.setParameter('time_sig_num', num.toDouble()),
+            onChanged: (n) =>
+                connection.setParameter('time_sig_num', n.toDouble()),
           ),
 
           // Click Subdivision
