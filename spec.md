@@ -145,18 +145,25 @@ struct HitEvent {
 
 ---
 
-* **Dynamic Responsive Node & Label Scaling Algorithm**:
-  - **Zoom Scale Factor (`zoomScale`)**:
-    - `8 Bars` / `4 Bars`: `1.0x` baseline density.
-    - `2 Bars`: `1.4x` expanded view.
-    - `1 Bar`: `2.0x` max zoom (double size!).
-  - **Window Scale Factor (`windowScale`)**: `clamp(canvasWidth / 1200.0, 0.75, 2.5)`.
-  - **Combined Dynamic Scale**: `dynamicScale = clamp(zoomScale * windowScale, 0.8, 3.0)`.
-  - **Scaling Targets**:
-    - Node Radius: `11.0f * dynamicScale` (grows up to 52px+ diameter for 2-meter throne viewing!).
-    - Checkmark Stroke Width: `2.5f * dynamicScale`.
-    - MS Offset Font & Pill Box: Scaled proportionally with `dynamicScale`.
-    - Drum Lane Sidebar & Ruler Text: Scaled dynamically with lane height & window scale.
+* **Instant Tolerance Boundary, Vector Symbols & Directional Guidance**:
+  - **Within Tolerance ($|\Delta\text{ms}| \le \text{Tolerance}$):** Pure Emerald Green (`#00FF88`) with a bold vector **Checkmark (`✓`)** drawn inside the note circle.
+  - **Beyond Tolerance ($|\Delta\text{ms}| > \text{Tolerance}$):**
+    - **Rush ($\Delta\text{ms} < 0$):** Vector Right Arrow **`>`** rendered inside note circle (indicating drummer must play *later*).
+    - **Drag ($\Delta\text{ms} > 0$):** Vector Left Arrow **`<`** rendered inside note circle (indicating drummer must play *earlier*).
+    - *(When `show_velocity_labels` is enabled, velocity integer renders inside instead).*
+  - Falloff ratio $t = \text{clamp}\left(\frac{|\Delta\text{ms}| - \text{Tolerance}}{\text{MaxErrorMs} - \text{Tolerance}}, 0.0, 1.0\right)$.
+    - **Rush:** Yellow (`#FFEA00`) $\rightarrow$ Orange $\rightarrow$ Electric Red (`#FF1744`).
+    - **Drag:** Cyan (`#00E5FF`) $\rightarrow$ Deep Blue $\rightarrow$ Vivid Purple (`#D500F9`).
+
+---
+
+### 4.5 Rolling Window Accuracy Score Bar (`GridComponent.cpp`)
+* **Accuracy Percentage Calculation**:
+  - Evaluated continuously over all visible notes in active history window (`barsWindow`).
+  - $\text{Accuracy\%} = \frac{N_{\text{green}}}{N_{\text{total}}} \times 100\%$ ($100\%$ if $N_{\text{total}} = 0$).
+* **UI Score Footer**:
+  - High-contrast bottom progress bar with Emerald Green fill (`#00FF88`).
+  - Bold text readout: `ACCURACY: 88% (22 / 25 Notes On-Grid)`.
 
 ---
 

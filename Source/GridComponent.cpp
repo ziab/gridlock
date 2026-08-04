@@ -114,17 +114,18 @@ void GridComponent::paint(juce::Graphics& g)
 
     const float labelWidth = 110.0f;
     const float rulerHeight = 24.0f;
+    const float footerHeight = 26.0f;
     const float boundsWidth = static_cast<float>(getWidth());
     const float boundsHeight = static_cast<float>(getHeight());
 
     const float canvasLeft = labelWidth;
     const float canvasWidth = boundsWidth - labelWidth;
 
-    if (canvasWidth <= 10.0f || boundsHeight <= rulerHeight + 10.0f)
+    if (canvasWidth <= 10.0f || boundsHeight <= rulerHeight + footerHeight + 10.0f)
         return;
 
     const float laneAreaTop = rulerHeight;
-    const float laneAreaHeight = boundsHeight - rulerHeight;
+    const float laneAreaHeight = boundsHeight - rulerHeight - footerHeight;
 
     const int numLanes = static_cast<int>(drumLanes.size());
     const float laneHeight = laneAreaHeight / static_cast<float>(numLanes);
@@ -216,7 +217,7 @@ void GridComponent::paint(juce::Graphics& g)
             {
                 // Prominent Bar Boundary Line & Ruler Label
                 g.setColour(juce::Colour(0xff38bdf8)); // Bright Sky Blue Bar Line
-                g.drawVerticalLine(static_cast<int>(x), 0.0f, boundsHeight);
+                g.drawVerticalLine(static_cast<int>(x), 0.0f, boundsHeight - footerHeight);
 
                 const int barNumber = static_cast<int>(std::floor(tick / barPpqInterval)) + 1;
                 g.setFont(juce::Font(12.0f, juce::Font::bold));
@@ -228,7 +229,7 @@ void GridComponent::paint(juce::Graphics& g)
             {
                 // Strong Beat Line & Ruler Number
                 g.setColour(juce::Colour(0xff475569)); // Medium Accent Beat Line
-                g.drawVerticalLine(static_cast<int>(x), rulerHeight, boundsHeight);
+                g.drawVerticalLine(static_cast<int>(x), rulerHeight, boundsHeight - footerHeight);
 
                 const int beatNumber = static_cast<int>(std::floor(std::fmod(tick, barPpqInterval))) + 1;
                 g.setColour(juce::Colour(0xff94a3b8));
@@ -241,10 +242,14 @@ void GridComponent::paint(juce::Graphics& g)
             {
                 // Faint Subdivision Line
                 g.setColour(juce::Colour(0xff1e293b));
-                g.drawVerticalLine(static_cast<int>(x), rulerHeight, boundsHeight);
+                g.drawVerticalLine(static_cast<int>(x), rulerHeight, boundsHeight - footerHeight);
             }
         }
     }
+
+    // Track Visible Hits for Rolling Window Accuracy Score Calculation
+    int totalVisibleHits = 0;
+    int greenVisibleHits = 0;
 
     // Render Hit Events with Live Real-Time Latency & Tolerance Recalculation
     const double userLatencyPpq = (static_cast<double>(latencyOffsetMsVal) / 1000.0) * (static_cast<double>(bpmVal) / 60.0);
@@ -267,6 +272,12 @@ void GridComponent::paint(juce::Graphics& g)
         const double liveDeltaMs = (deltaPpq / (static_cast<double>(bpmVal) / 60.0)) * 1000.0;
         const float absDelta = static_cast<float>(std::abs(liveDeltaMs));
 
+        totalVisibleHits++;
+        if (absDelta <= toleranceMsVal)
+        {
+            greenVisibleHits++;
+        }
+
         const float normalizedX = static_cast<float>((compPpq - minPpq) / totalPpqWindow);
         const float hitX = canvasLeft + (normalizedX * canvasWidth);
         const float hitY = laneAreaTop + (laneIndex * laneHeight) + (laneHeight * 0.5f);
@@ -284,9 +295,17 @@ void GridComponent::paint(juce::Graphics& g)
         g.setColour(fillColour);
         g.fillEllipse(hitRect);
 
-        // Draw Checkmark vector path inside node for hits within tolerance; draw Velocity only if enabled
-        if (absDelta <= toleranceMsVal)
+        // Render Vector Symbol inside node circle
+        if (displayVelLabels)
         {
+            const float velFontHeight = std::clamp(10.0f * dynamicScale, 9.0f, 22.0f);
+            g.setColour (juce::Colour (0xff000000));
+            g.setFont (juce::Font (velFontHeight, juce::Font::bold));
+            g.drawText (juce::String (event.velocity), hitRect, juce::Justification::centred, false);
+        }
+        else if (absDelta <= toleranceMsVal)
+        {
+            // Vector Checkmark '✓' inside green node
             juce::Path checkPath;
             const float r = nodeRadius * 0.55f;
             checkPath.startNewSubPath (hitX - r * 0.55f, hitY + r * 0.05f);
@@ -296,12 +315,29 @@ void GridComponent::paint(juce::Graphics& g)
             g.setColour (juce::Colour (0xff0a0c10));
             g.strokePath (checkPath, juce::PathStrokeType (strokeWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
-        else if (displayVelLabels)
+        else if (liveDeltaMs < 0.0f)
         {
-            const float velFontHeight = std::clamp(10.0f * dynamicScale, 9.0f, 22.0f);
-            g.setColour (juce::Colour (0xff000000));
-            g.setFont (juce::Font (velFontHeight, juce::Font::bold));
-            g.drawText (juce::String (event.velocity), hitRect, juce::Justification::centred, false);
+            // Vector Right Arrow '>' for Rush (tells drummer to play LATER)
+            juce::Path arrowPath;
+            const float r = nodeRadius * 0.45f;
+            arrowPath.startNewSubPath (hitX - r * 0.45f, hitY - r * 0.65f);
+            arrowPath.lineTo (hitX + r * 0.45f, hitY);
+            arrowPath.lineTo (hitX - r * 0.45f, hitY + r * 0.65f);
+
+            g.setColour (juce::Colour (0xff0a0c10));
+            g.strokePath (arrowPath, juce::PathStrokeType (strokeWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+        else
+        {
+            // Vector Left Arrow '<' for Drag (tells drummer to play EARLIER)
+            juce::Path arrowPath;
+            const float r = nodeRadius * 0.45f;
+            arrowPath.startNewSubPath (hitX + r * 0.45f, hitY - r * 0.65f);
+            arrowPath.lineTo (hitX - r * 0.45f, hitY);
+            arrowPath.lineTo (hitX + r * 0.45f, hitY + r * 0.65f);
+
+            g.setColour (juce::Colour (0xff0a0c10));
+            g.strokePath (arrowPath, juce::PathStrokeType (strokeWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
 
         // Display NOTE # Label above note circle if enabled
@@ -346,5 +382,54 @@ void GridComponent::paint(juce::Graphics& g)
 
     // Draw Current Playhead Line (Bright Cyan Vertical Bar)
     g.setColour(juce::Colour(0xff00e5ff));
-    g.drawVerticalLine(static_cast<int>(boundsWidth - 2.0f), 0.0f, boundsHeight);
+    g.drawVerticalLine(static_cast<int>(boundsWidth - 2.0f), 0.0f, boundsHeight - footerHeight);
+
+    // Draw Bottom Accuracy Score Footer Bar
+    const float footerY = boundsHeight - footerHeight;
+    g.setColour(juce::Colour(0xff181b24));
+    g.fillRect(juce::Rectangle<float>(0.0f, footerY, boundsWidth, footerHeight));
+
+    g.setColour(juce::Colour(0xff2d3245));
+    g.drawHorizontalLine(static_cast<int>(footerY), 0.0f, boundsWidth);
+    g.drawVerticalLine(static_cast<int>(labelWidth), footerY, boundsHeight);
+
+    const int accuracyPct = (totalVisibleHits > 0)
+        ? static_cast<int>(std::round((static_cast<double>(greenVisibleHits) / static_cast<double>(totalVisibleHits)) * 100.0))
+        : 100;
+
+    // Sidebar Score Title
+    g.setColour(juce::Colour(0xff94a3b8));
+    g.setFont(juce::Font(11.0f, juce::Font::bold));
+    g.drawText("ACCURACY", juce::Rectangle<float>(12.0f, footerY, labelWidth - 16.0f, footerHeight),
+               juce::Justification::centredLeft, true);
+
+    // Progress Bar Track
+    const float barTrackX = canvasLeft + 12.0f;
+    const float barTrackW = std::max(100.0f, canvasWidth - 320.0f);
+    const float barTrackH = 10.0f;
+    const float barTrackY = footerY + (footerHeight - barTrackH) * 0.5f;
+
+    g.setColour(juce::Colour(0xff111827));
+    g.fillRoundedRectangle(juce::Rectangle<float>(barTrackX, barTrackY, barTrackW, barTrackH), 3.0f);
+
+    // Emerald Green Progress Fill
+    const float fillW = barTrackW * (static_cast<float>(accuracyPct) / 100.0f);
+    if (fillW > 0.0f)
+    {
+        g.setColour(juce::Colour(0xff00ff88)); // Pure Emerald Green
+        g.fillRoundedRectangle(juce::Rectangle<float>(barTrackX, barTrackY, fillW, barTrackH), 3.0f);
+    }
+
+    // Progress Bar Border
+    g.setColour(juce::Colour(0xff374151));
+    g.drawRoundedRectangle(juce::Rectangle<float>(barTrackX, barTrackY, barTrackW, barTrackH), 3.0f, 1.0f);
+
+    // Accuracy Score Text Readout
+    const float textX = barTrackX + barTrackW + 16.0f;
+    const juce::String scoreText = juce::String(accuracyPct) + "%  (" + juce::String(greenVisibleHits) + " / " + juce::String(totalVisibleHits) + " On-Grid)";
+
+    g.setColour(juce::Colour(0xff00ff88));
+    g.setFont(juce::Font(13.0f, juce::Font::bold));
+    g.drawText(scoreText, juce::Rectangle<float>(textX, footerY, boundsWidth - textX - 12.0f, footerHeight),
+               juce::Justification::centredLeft, true);
 }
