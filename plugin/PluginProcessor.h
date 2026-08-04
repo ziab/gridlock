@@ -94,8 +94,6 @@ class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor
 
     static double getSubdivisionPpq (int index) noexcept;
 
-    static constexpr double kHiHatDebounceWindowMs = 70.0;
-
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout ();
     void updateHostSyncAndPlayhead (float internalBpmVal, int timeSigNumVal, bool isPausedVal);
     void processIncomingMidi (const juce::MidiBuffer &midiMessages, double srToUse, double gridInterval,

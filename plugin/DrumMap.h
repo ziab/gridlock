@@ -49,6 +49,10 @@ struct LaneInfo
     std::vector<uint8_t> notes;
 };
 
+// Minimum interval (ms) between another hi-hat strike and a Note 46 (Open Tip) before it is accepted.
+// Hard hits produce a trailing Note 46 ~40-60ms after the edge trigger; this window suppresses that noise.
+static constexpr double kHiHatDebounceWindowMs = 100.0;
+
 // Notes to exclude entirely from the grid display (currently no notes excluded)
 inline bool isExcluded (uint8_t note) noexcept
 {
