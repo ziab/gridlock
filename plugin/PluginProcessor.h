@@ -94,8 +94,13 @@ class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor
 
     static double getSubdivisionPpq (int index) noexcept;
 
-  private:
+    static constexpr double kHiHatDebounceWindowMs = 70.0;
+
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout ();
+    void updateHostSyncAndPlayhead (float internalBpmVal, int timeSigNumVal, bool isPausedVal);
+    void processIncomingMidi (const juce::MidiBuffer &midiMessages, double srToUse, double gridInterval,
+                              float toleranceMs, int minVelocity, double totalLatencyPpq);
+    bool shouldFilterHiHatTrigger (uint8_t noteNum, double nowMs);
     void generateTestModeBeat (double blockStartPpq, double blockEndPpq, double totalLatencyPpq, double gridInterval,
                                float toleranceMs);
 

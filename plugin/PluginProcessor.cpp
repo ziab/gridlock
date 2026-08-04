@@ -184,7 +184,43 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
 
     const double gridInterval = getSubdivisionPpq (subChoice);
 
-    // Sync with host playhead or fallback to internal clock
+    // Sync playhead with host DAW or fallback to internal clock
+    updateHostSyncAndPlayhead (internalBpmVal, timeSigNumVal, isPausedVal);
+
+    const double srToUse = (sampleRate > 0.0) ? sampleRate : 44100.0;
+    const double blockStartPpq = currentPpqPosition;
+    const double blockEndPpq = blockStartPpq + numSamples * (currentBpm / 60.0) / srToUse;
+
+    // Render Audio Click ONLY in Standalone mode when NOT paused
+    if (isStandaloneMode && !isPausedVal)
+    {
+        clickGenerator.renderBlock (buffer, numSamples, srToUse, blockStartPpq, currentBpm, currentTimeSigNum,
+                                    clickSubChoice, clickPresetVal, clickVolVal, clickPanVal, clickEnabledVal);
+    }
+
+    const double autoLatencyMs = (static_cast<double> (getLatencySamples ()) / srToUse) * 1000.0;
+    const double totalLatencyMs = autoLatencyMs + static_cast<double> (userLatencyMs);
+    const double totalLatencyPpq = (totalLatencyMs / 1000.0) * (currentBpm / 60.0);
+
+    // Process incoming physical MIDI events
+    processIncomingMidi (midiMessages, srToUse, gridInterval, toleranceMs, minVelocity, totalLatencyPpq);
+
+    // Synthesize Humanized Rock Drum Beat in TEST / DEMO Mode
+    if (testModeVal && !isPausedVal && currentTimeSigNum > 0)
+    {
+        generateTestModeBeat (blockStartPpq, blockEndPpq, totalLatencyPpq, gridInterval, toleranceMs);
+    }
+
+    // Advance internal clock position ONLY when not paused
+    if (!isPausedVal)
+    {
+        internalPpqPosition += numSamples * (currentBpm / 60.0) / srToUse;
+    }
+}
+
+void MidiGridAnalyzerAudioProcessor::updateHostSyncAndPlayhead (float internalBpmVal, int timeSigNumVal,
+                                                                bool isPausedVal)
+{
     bool hostPpqValid = false;
     double hostBpm = internalBpmVal;
     double hostPpq = internalPpqPosition;
@@ -219,23 +255,33 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
     currentPpqPosition = hostPpqValid ? hostPpq : internalPpqPosition;
     currentTimeSigNum = (hostTimeSigNum > 0) ? hostTimeSigNum : timeSigNumVal;
     hostIsPlaying = (hostPlaying || !hostPpqValid) && !isPausedVal;
+}
 
-    const double srToUse = (sampleRate > 0.0) ? sampleRate : 44100.0;
-    const double blockStartPpq = currentPpqPosition;
-    const double blockEndPpq = blockStartPpq + numSamples * (currentBpm / 60.0) / srToUse;
+bool MidiGridAnalyzerAudioProcessor::shouldFilterHiHatTrigger (uint8_t noteNum, double nowMs)
+{
+    const bool isOtherHiHat = (noteNum == DrumMap::ClosedHiHatEdge || noteNum == DrumMap::ClosedHiHat ||
+                               noteNum == DrumMap::PedalHiHat || noteNum == DrumMap::OpenHiHatEdge);
 
-    // Render Audio Click ONLY in Standalone mode when NOT paused
-    if (isStandaloneMode && !isPausedVal)
+    if (isOtherHiHat)
     {
-        clickGenerator.renderBlock (buffer, numSamples, srToUse, blockStartPpq, currentBpm, currentTimeSigNum,
-                                    clickSubChoice, clickPresetVal, clickVolVal, clickPanVal, clickEnabledVal);
+        lastOtherHiHatTimeMs = nowMs;
+        return false;
     }
 
-    const double autoLatencyMs = (static_cast<double> (getLatencySamples ()) / srToUse) * 1000.0;
-    const double totalLatencyMs = autoLatencyMs + static_cast<double> (userLatencyMs);
-    const double totalLatencyPpq = (totalLatencyMs / 1000.0) * (currentBpm / 60.0);
+    if (noteNum == DrumMap::OpenHiHat)
+    {
+        // Ignore secondary Note 46 re-trigger if it arrives within debouncing window of another hi-hat strike
+        if ((nowMs - lastOtherHiHatTimeMs) < kHiHatDebounceWindowMs)
+            return true;
+    }
 
-    // Process incoming physical MIDI events
+    return false;
+}
+
+void MidiGridAnalyzerAudioProcessor::processIncomingMidi (const juce::MidiBuffer &midiMessages, double srToUse,
+                                                          double gridInterval, float toleranceMs, int minVelocity,
+                                                          double totalLatencyPpq)
+{
     for (const auto metadata : midiMessages)
     {
         const auto msg = metadata.getMessage ();
@@ -246,19 +292,8 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
             const uint8_t noteNum = static_cast<uint8_t> (msg.getNoteNumber ());
             const double nowMs = juce::Time::getMillisecondCounterHiRes ();
 
-            const bool isOtherHiHat = (noteNum == DrumMap::ClosedHiHatEdge || noteNum == DrumMap::ClosedHiHat ||
-                                       noteNum == DrumMap::PedalHiHat || noteNum == DrumMap::OpenHiHatEdge);
-
-            if (isOtherHiHat)
-            {
-                lastOtherHiHatTimeMs = nowMs;
-            }
-            else if (noteNum == DrumMap::OpenHiHat)
-            {
-                // Ignore secondary Note 46 re-trigger if it arrives within 70ms of another hi-hat strike
-                if ((nowMs - lastOtherHiHatTimeMs) < 70.0)
-                    continue;
-            }
+            if (shouldFilterHiHatTrigger (noteNum, nowMs))
+                continue;
 
             const int sampleOffset = metadata.samplePosition;
             const double rawHitPpq = currentPpqPosition + (sampleOffset * (currentBpm / 60.0) / srToUse);
@@ -298,18 +333,6 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
 
             ringBuffer.push (event);
         }
-    }
-
-    // Synthesize Humanized Rock Drum Beat in TEST / DEMO Mode
-    if (testModeVal && !isPausedVal && currentTimeSigNum > 0)
-    {
-        generateTestModeBeat (blockStartPpq, blockEndPpq, totalLatencyPpq, gridInterval, toleranceMs);
-    }
-
-    // Advance internal clock position ONLY when not paused
-    if (!isPausedVal)
-    {
-        internalPpqPosition += numSamples * (currentBpm / 60.0) / srToUse;
     }
 }
 
