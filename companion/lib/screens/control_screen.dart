@@ -460,33 +460,52 @@ class _ControlScreenState extends State<ControlScreen>
     dynamic timeSig,
     dynamic clickSub,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          BpmDial(
-            value: bpm?.value ?? 120.0,
-            min: bpm?.min ?? 40.0,
-            max: bpm?.max ?? 300.0,
-            step: bpm?.step ?? 0.1,
-            onChanged: (v) => connection.setParameter('internal_bpm', v),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    BpmDial(
+                      value: bpm?.value ?? 120.0,
+                      min: bpm?.min ?? 40.0,
+                      max: bpm?.max ?? 300.0,
+                      step: bpm?.step ?? 0.1,
+                      onChanged: (v) =>
+                          connection.setParameter('internal_bpm', v),
+                    ),
+                    const SizedBox(height: 12),
+                    SignaturePicker(
+                      currentNumerator: (timeSig?.value ?? 4.0).round(),
+                      onChanged: (n) =>
+                          connection.setParameter('time_sig_num', n.toDouble()),
+                    ),
+                    const SizedBox(height: 12),
+                    SubdivisionPicker(
+                      currentIndex: (clickSub?.value ?? 1.0).round(),
+                      onChanged: (i) => connection.setParameter(
+                        'click_subdivision',
+                        i.toDouble(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-
-          SignaturePicker(
-            currentNumerator: (timeSig?.value ?? 4.0).round(),
-            onChanged: (n) =>
-                connection.setParameter('time_sig_num', n.toDouble()),
-          ),
-
-          // Click Subdivision
-          SubdivisionPicker(
-            currentIndex: (clickSub?.value ?? 1.0).round(),
-            onChanged: (i) =>
-                connection.setParameter('click_subdivision', i.toDouble()),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
