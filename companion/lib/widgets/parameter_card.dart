@@ -13,6 +13,7 @@ class ParameterCard extends StatelessWidget {
   final double step;
   final List<String> options;
   final ValueChanged<double> onChanged;
+  final ValueChanged<double>? onChangeEnd;
   final String? suffix;
 
   const ParameterCard({
@@ -25,6 +26,7 @@ class ParameterCard extends StatelessWidget {
     this.step = 0.01,
     this.options = const [],
     required this.onChanged,
+    this.onChangeEnd,
     this.suffix,
   });
 
@@ -121,6 +123,9 @@ class ParameterCard extends StatelessWidget {
         onChanged: (v) {
           HapticFeedback.selectionClick();
           onChanged(v);
+        },
+        onChangeEnd: (v) {
+          onChangeEnd?.call(v);
         },
       ),
     );

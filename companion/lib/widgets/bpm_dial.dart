@@ -12,6 +12,7 @@ class BpmDial extends StatefulWidget {
   final double max;
   final double step;
   final ValueChanged<double> onChanged;
+  final ValueChanged<double>? onChangedEnd;
 
   const BpmDial({
     super.key,
@@ -20,6 +21,7 @@ class BpmDial extends StatefulWidget {
     this.max = 300.0,
     this.step = 1.0,
     required this.onChanged,
+    this.onChangedEnd,
   });
 
   @override
@@ -65,6 +67,14 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
       widget.onChanged(snapped);
       HapticFeedback.selectionClick();
     }
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    widget.onChangedEnd?.call(widget.value);
+  }
+
+  void _onPanCancel() {
+    widget.onChangedEnd?.call(widget.value);
   }
 
   void _onTap() async {
@@ -120,7 +130,9 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
       ),
     );
     if (result != null) {
-      widget.onChanged(result.clamp(widget.min, widget.max).roundToDouble());
+      final rounded = result.clamp(widget.min, widget.max).roundToDouble();
+      widget.onChanged(rounded);
+      widget.onChangedEnd?.call(rounded);
     }
   }
 
@@ -129,6 +141,8 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
     return GestureDetector(
       onPanStart: _onPanStart,
       onPanUpdate: _onPanUpdate,
+      onPanEnd: _onPanEnd,
+      onPanCancel: _onPanCancel,
       onTap: _onTap,
       child: AnimatedBuilder(
         animation: _glowController,

@@ -479,7 +479,11 @@ class _ControlScreenState extends State<ControlScreen>
                       min: bpm?.min ?? 40.0,
                       max: bpm?.max ?? 300.0,
                       step: 1.0,
-                      onChanged: (v) => connection.setParameter(
+                      onChanged: (v) => connection.updateLocalParameterValue(
+                        'internal_bpm',
+                        v.roundToDouble(),
+                      ),
+                      onChangedEnd: (v) => connection.setParameter(
                         'internal_bpm',
                         v.roundToDouble(),
                       ),
@@ -567,6 +571,12 @@ class _ControlScreenState extends State<ControlScreen>
               divisions: divisions > 0 ? divisions : 50,
               onChanged: (v) {
                 HapticFeedback.selectionClick();
+                connection.updateLocalParameterValue(
+                  'tolerance_ms',
+                  (v * 2).round() / 2,
+                );
+              },
+              onChangeEnd: (v) {
                 connection.setParameter('tolerance_ms', (v * 2).round() / 2);
               },
             ),
@@ -846,7 +856,9 @@ class _ControlScreenState extends State<ControlScreen>
                             step: param.step > 0 ? param.step : 0.01,
                             options: param.options,
                             suffix: def.suffix,
-                            onChanged: (v) => conn.setParameter(def.id, v),
+                            onChanged: (v) =>
+                                conn.updateLocalParameterValue(def.id, v),
+                            onChangeEnd: (v) => conn.setParameter(def.id, v),
                           );
                         },
                       ),

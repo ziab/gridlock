@@ -71,7 +71,15 @@ class ConnectionService extends ChangeNotifier {
     _handleDisconnect();
   }
 
-  /// Set a parameter value (denormalized).
+  /// Update parameter value in local state for smooth visual feedback without sending network frames over WebSocket.
+  void updateLocalParameterValue(String id, double value) {
+    if (parameters.containsKey(id)) {
+      parameters[id]!.value = value;
+      notifyListeners();
+    }
+  }
+
+  /// Send a parameter update command to the server.
   void setParameter(String id, double value) {
     if (!_connected || _channel == null) return;
 
