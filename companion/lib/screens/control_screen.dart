@@ -484,19 +484,24 @@ class _ControlScreenState extends State<ControlScreen>
                         v.roundToDouble(),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     SignaturePicker(
                       currentNumerator: (timeSig?.value ?? 4.0).round(),
                       onChanged: (n) =>
                           connection.setParameter('time_sig_num', n.toDouble()),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     SubdivisionPicker(
                       currentIndex: (clickSub?.value ?? 1.0).round(),
                       onChanged: (i) => connection.setParameter(
                         'click_subdivision',
                         i.toDouble(),
                       ),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildToleranceControl(
+                      connection,
+                      connection.parameters['tolerance_ms'],
                     ),
                   ],
                 ),
@@ -505,6 +510,68 @@ class _ControlScreenState extends State<ControlScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildToleranceControl(
+    ConnectionService connection,
+    dynamic tolerance,
+  ) {
+    final val = (tolerance?.value ?? 20.0).toDouble();
+    final minVal = (tolerance?.min ?? 0.0).toDouble();
+    final maxVal = (tolerance?.max ?? 100.0).toDouble();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'TIMING TOLERANCE',
+              style: TextStyle(
+                color: Color(0xFF8b92a8),
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 2.5,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '±${val.toStringAsFixed(1)} ms',
+              style: const TextStyle(
+                color: Color(0xFF00FF88),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        SizedBox(
+          width: 340,
+          child: SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: const Color(0xFF00FF88),
+              inactiveTrackColor: const Color(0xFF1e2235),
+              thumbColor: const Color(0xFF00FF88),
+              overlayColor: const Color(0xFF00FF88).withValues(alpha: 0.2),
+              trackHeight: 4,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+            ),
+            child: Slider(
+              value: val.clamp(minVal, maxVal),
+              min: minVal,
+              max: maxVal,
+              divisions: 200,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                connection.setParameter('tolerance_ms', (v * 2).round() / 2);
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
