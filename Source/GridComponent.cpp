@@ -79,6 +79,7 @@ void GridComponent::updateEvents(const std::vector<HitEvent>& events,
                                  int timeSigNum,
                                  bool showMsLabels,
                                  bool showVelocityLabels,
+                                 bool showNoteNumbers,
                                  float toleranceMs,
                                  float latencyOffsetMs,
                                  float bpm)
@@ -90,6 +91,7 @@ void GridComponent::updateEvents(const std::vector<HitEvent>& events,
     timeSigNumerator = (timeSigNum > 0) ? timeSigNum : 4;
     displayMsLabels = showMsLabels;
     displayVelLabels = showVelocityLabels;
+    displayNoteNumLabels = showNoteNumbers;
     toleranceMsVal = (toleranceMs >= 0.0f) ? toleranceMs : 20.0f;
     latencyOffsetMsVal = latencyOffsetMs;
     bpmVal = (bpm > 0.0f) ? bpm : 120.0f;
@@ -300,6 +302,25 @@ void GridComponent::paint(juce::Graphics& g)
             g.setColour (juce::Colour (0xff000000));
             g.setFont (juce::Font (velFontHeight, juce::Font::bold));
             g.drawText (juce::String (event.velocity), hitRect, juce::Justification::centred, false);
+        }
+
+        // Display NOTE # Label above note circle if enabled
+        if (displayNoteNumLabels)
+        {
+            juce::String noteText = "#" + juce::String(event.noteNumber);
+
+            const float noteLabelW = 38.0f * dynamicScale;
+            const float noteLabelH = 13.0f * dynamicScale;
+            const auto noteLabelRect = juce::Rectangle<float>(hitX - (noteLabelW * 0.5f), hitY - nodeRadius - noteLabelH - 2.0f, noteLabelW, noteLabelH);
+
+            // Dark pill for high contrast note number debugging
+            g.setColour(juce::Colour(0xd01e293b));
+            g.fillRoundedRectangle(noteLabelRect, 3.0f * dynamicScale);
+
+            const float noteFontHeight = std::clamp(9.5f * dynamicScale, 8.5f, 20.0f);
+            g.setColour(juce::Colour(0xff38bdf8)); // Bright Sky Blue Note Text
+            g.setFont(juce::Font(noteFontHeight, juce::Font::bold));
+            g.drawText(noteText, noteLabelRect, juce::Justification::centred, false);
         }
 
         // Display MS Offset Label underneath note if enabled

@@ -136,6 +136,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
     ));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ "show_note_numbers", 1 },
+        "Display Note Numbers",
+        false
+    ));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ "test_mode", 1 },
         "Rock Beat Demo Mode",
         false

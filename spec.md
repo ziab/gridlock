@@ -132,6 +132,7 @@ struct HitEvent {
 | `is_paused`   | Pause/Freeze Grid| Bool | Toggle | False |
 | `show_ms_labels`| Display MS Offsets| Bool| Toggle | True |
 | `show_velocity_labels`| Display Velocity| Bool| Toggle | False |
+| `show_note_numbers`  | Display Note # Labels| Bool| Toggle | False |
 | `test_mode`    | Rock Beat Demo Mode| Bool| Toggle / CLI `--test` | False |
 | `note_filter`  | Display Mode | Choice | All Notes, Roland/GM Drum Map, Custom | Roland/GM Drum Map |
 

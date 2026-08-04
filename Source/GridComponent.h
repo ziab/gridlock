@@ -21,6 +21,7 @@ public:
                       int timeSigNum = 4,
                       bool showMsLabels = true,
                       bool showVelocityLabels = false,
+                      bool showNoteNumbers = false,
                       float toleranceMs = 20.0f,
                       float latencyOffsetMs = 0.0f,
                       float bpm = 120.0f);
@@ -36,6 +37,7 @@ private:
     int timeSigNumerator{ 4 };
     bool displayMsLabels{ true };
     bool displayVelLabels{ false };
+    bool displayNoteNumLabels{ false };
     float toleranceMsVal{ 20.0f };
     float latencyOffsetMsVal{ 0.0f };
     float bpmVal{ 120.0f };

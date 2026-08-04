@@ -11,9 +11,9 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     if (auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
     {
         const auto area = display->userArea;
-        const int minW = std::min(1080, area.getWidth() / 2);
+        const int minW = std::min(1150, area.getWidth() / 2);
         const int minH = std::min(480, area.getHeight() / 2);
-        const int defaultW = std::min(1560, static_cast<int>(area.getWidth() * 0.9));
+        const int defaultW = std::min(1640, static_cast<int>(area.getWidth() * 0.92));
         const int defaultH = std::min(680, static_cast<int>(area.getHeight() * 0.8));
 
         setResizeLimits (minW, minH, area.getWidth(), area.getHeight());
@@ -21,8 +21,8 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     }
     else
     {
-        setResizeLimits (1080, 480, 1920, 1080);
-        setSize (1560, 640);
+        setResizeLimits (1150, 480, 1920, 1080);
+        setSize (1640, 640);
     }
 
     addAndMakeVisible (gridComponent);
@@ -131,6 +131,13 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     showVelButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xffffffff));
     addAndMakeVisible (showVelButton);
 
+    showNoteNumButton.setClickingTogglesState (true);
+    showNoteNumButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
+    showNoteNumButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xff06b6d4)); // Cyan NOTE #
+    showNoteNumButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffb0b8c8));
+    showNoteNumButton.setColour (juce::TextButton::textColourOnId, juce::Colour (0xffffffff));
+    addAndMakeVisible (showNoteNumButton);
+
     testButton.setClickingTogglesState (true);
     testButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2d3245));
     testButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffec4899)); // Hot Pink TEST
@@ -163,6 +170,7 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
     pauseAttachment       = std::make_unique<ButtonAttachment>  (apvts, "is_paused",           pauseButton);
     showMsAttachment      = std::make_unique<ButtonAttachment>  (apvts, "show_ms_labels",      showMsButton);
     showVelAttachment     = std::make_unique<ButtonAttachment>  (apvts, "show_velocity_labels",showVelButton);
+    showNoteNumAttachment = std::make_unique<ButtonAttachment>  (apvts, "show_note_numbers",   showNoteNumButton);
     testAttachment        = std::make_unique<ButtonAttachment>  (apvts, "test_mode",           testButton);
 
     // Custom time signature combo box handler mapping to time_sig_num
@@ -258,11 +266,12 @@ void MidiGridAnalyzerAudioProcessorEditor::timerCallback()
     const int timeSigNum = processorRef.getCurrentTimeSigNum();
     const bool showMsVal = (processorRef.getAPVTS().getRawParameterValue("show_ms_labels")->load() > 0.5f);
     const bool showVelVal = (processorRef.getAPVTS().getRawParameterValue("show_velocity_labels")->load() > 0.5f);
+    const bool showNoteNumVal = (processorRef.getAPVTS().getRawParameterValue("show_note_numbers")->load() > 0.5f);
     const float toleranceVal = processorRef.getAPVTS().getRawParameterValue("tolerance_ms")->load();
     const float latencyVal = processorRef.getAPVTS().getRawParameterValue("latency_offset_ms")->load();
     const float bpmVal = static_cast<float>(processorRef.getCurrentBpm());
 
-    gridComponent.updateEvents (eventHistory, currentPpq, barsVal, subdivisionPpq, timeSigNum, showMsVal, showVelVal, toleranceVal, latencyVal, bpmVal);
+    gridComponent.updateEvents (eventHistory, currentPpq, barsVal, subdivisionPpq, timeSigNum, showMsVal, showVelVal, showNoteNumVal, toleranceVal, latencyVal, bpmVal);
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::paint (juce::Graphics& g)
@@ -330,6 +339,9 @@ void MidiGridAnalyzerAudioProcessorEditor::resized()
 
     showVelButton.setBounds (x, topMargin, 76, controlHeight);
     x += 80;
+
+    showNoteNumButton.setBounds (x, topMargin, 68, controlHeight);
+    x += 72;
 
     testButton.setBounds (x, topMargin, 85, controlHeight);
 
