@@ -873,7 +873,6 @@ class _ControlScreenState extends State<ControlScreen>
               _SecondaryDef('click_volume', 'Click Volume'),
               _SecondaryDef('click_pan', 'Click Panning'),
               _SecondaryDef('click_sample_preset', 'Click Sound Preset'),
-              _SecondaryDef('bars_window', 'History Bars'),
               _SecondaryDef('subdivision', 'Grid Subdivision'),
               _SecondaryDef(
                 'latency_offset_ms',
