@@ -71,3 +71,27 @@ target_compile_definitions(MidiGridAnalyzer PRIVATE
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
+
+# ── Standalone C++ Networking Integration Test Executable ─────────
+juce_add_console_app(RemoteControlServerTests
+    PRODUCT_NAME "Remote Control Server Tests"
+)
+
+target_sources(RemoteControlServerTests PRIVATE
+    Source/RemoteControlServer.h
+    Source/RemoteControlServer.cpp
+    Source/RemoteControlServerTests.cpp
+)
+
+target_link_libraries(RemoteControlServerTests PRIVATE
+    juce::juce_audio_processors
+    juce::juce_audio_basics
+    juce::juce_gui_basics
+    juce::juce_core
+)
+
+target_compile_definitions(RemoteControlServerTests PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_MODAL_LOOPS_PERMITTED=1
+)

@@ -4,7 +4,7 @@ import 'dart:io';
 /// Discovers a Gridlock standalone app on the local network via UDP broadcast.
 ///
 /// Sends "GRIDLOCK_DISCOVER" on port 9877 and listens for
-/// "GRIDLOCK_HERE:<wsPort>" replies. Returns the first respondent's IP + port.
+/// "GRIDLOCK_HERE:[wsPort]" replies. Returns the first respondent's IP + port.
 class DiscoveryService {
   static const int _udpPort = 9877;
   static const String _probe = 'GRIDLOCK_DISCOVER';
@@ -46,11 +46,11 @@ class DiscoveryService {
         }
       });
 
-      // Send discovery probes every 500ms
       final probeBytes = _probe.codeUnits;
       final broadcastAddr = InternetAddress('255.255.255.255');
 
-      Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      Timer? probeTimer;
+      probeTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
         if (completer.isCompleted) {
           timer.cancel();
           return;
@@ -68,6 +68,7 @@ class DiscoveryService {
       );
 
       sub.cancel();
+      probeTimer.cancel();
       return result;
     } catch (e) {
       return null;
