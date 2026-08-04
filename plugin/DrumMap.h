@@ -51,6 +51,11 @@ struct LaneInfo
 
 // Velocity-dependent debounce for Note 46 (Open Hi-Hat Tip) ghost-note suppression.
 //
+// NOTE: This logic is specific to the Roland TD-27 module paired with the Roland VH-14D
+// digital hi-hat cymbal. On hard edge hits the VH-14D fires the edge/closed note first,
+// then emits a secondary Note 46 (open tip) ~40-60ms later as a hardware artifact.
+// This debounce suppresses that spurious retrigger without affecting legitimate open-hat strikes.
+//
 // Hard open-hat hits arrive loud and legitimately after ~60ms.
 // Ghost retriggers are quiet (velocity ~7) and should be suppressed for the full 200ms window.
 //
