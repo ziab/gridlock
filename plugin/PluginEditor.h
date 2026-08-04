@@ -5,6 +5,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_opengl/juce_opengl.h>
 
 class MidiGridAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
@@ -80,6 +81,8 @@ class MidiGridAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor, 
     std::unique_ptr<ButtonAttachment> testAttachment;
 
     std::vector<HitEvent> eventHistory;
+
+    juce::OpenGLContext openGLContext;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiGridAnalyzerAudioProcessorEditor)
 };

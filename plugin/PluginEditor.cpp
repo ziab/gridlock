@@ -238,11 +238,13 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
         break;
     }
 
+    openGLContext.attachTo (*this);
     startTimerHz (60);
 }
 
 MidiGridAnalyzerAudioProcessorEditor::~MidiGridAnalyzerAudioProcessorEditor ()
 {
+    openGLContext.detach ();
     juce::Desktop::setScreenSaverEnabled (true);
     stopTimer ();
 }
