@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/connection_service.dart';
 import '../services/discovery_service.dart';
-import '../widgets/bpm_dial.dart';
+import '../services/practice_timer_service.dart';
+import '../widgets/bpm_ruler_selector.dart';
+import '../widgets/practice_timer_ruler_display.dart';
+import '../widgets/practice_setup_modal.dart';
 import '../widgets/signature_picker.dart';
 import '../widgets/subdivision_picker.dart';
 import '../widgets/parameter_card.dart';
@@ -21,10 +24,12 @@ class _ControlScreenState extends State<ControlScreen>
   bool _discovering = false;
   String? _errorMessage;
   late AnimationController _pulseController;
+  late PracticeTimerService _practiceTimerService;
 
   @override
   void initState() {
     super.initState();
+    _practiceTimerService = PracticeTimerService();
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -35,6 +40,7 @@ class _ControlScreenState extends State<ControlScreen>
   @override
   void dispose() {
     _pulseController.dispose();
+    _practiceTimerService.dispose();
     super.dispose();
   }
 
@@ -76,13 +82,21 @@ class _ControlScreenState extends State<ControlScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ConnectionService>(
-      builder: (context, connection, _) {
-        if (!connection.isConnected) {
-          return _buildDiscoveryView(connection);
-        }
-        return _buildControlView(connection);
-      },
+    return ChangeNotifierProvider<PracticeTimerService>.value(
+      value: _practiceTimerService,
+      child: Consumer2<ConnectionService, PracticeTimerService>(
+        builder: (context, connection, timerService, _) {
+          if (!connection.isConnected) {
+            return _buildDiscoveryView(connection);
+          }
+
+          if (timerService.isPracticing) {
+            return _buildPracticeModeView(connection, timerService);
+          }
+
+          return _buildControlView(connection, timerService);
+        },
+      ),
     );
   }
 
@@ -342,12 +356,16 @@ class _ControlScreenState extends State<ControlScreen>
   }
 
   // ── Main Control View ───────────────────────────────────────────
-  Widget _buildControlView(ConnectionService connection) {
+  Widget _buildControlView(
+    ConnectionService connection,
+    PracticeTimerService timerService,
+  ) {
     final params = connection.parameters;
 
     final bpm = params['internal_bpm'];
     final timeSig = params['time_sig_num'];
     final clickSub = params['click_subdivision'];
+    final currentBpm = (bpm?.value ?? 120.0).roundToDouble();
 
     return Scaffold(
       backgroundColor: const Color(0xFF0a0c10),
@@ -359,11 +377,18 @@ class _ControlScreenState extends State<ControlScreen>
 
             // Main Drum Throne Controls
             Expanded(
-              child: _buildPrimaryControls(connection, bpm, timeSig, clickSub),
+              child: _buildPrimaryControls(
+                connection,
+                timerService,
+                bpm,
+                currentBpm,
+                timeSig,
+                clickSub,
+              ),
             ),
 
             // Quick Actions & Options Footer
-            _buildFooterActions(connection, params),
+            _buildFooterActions(connection, timerService, currentBpm, params),
           ],
         ),
       ),
@@ -453,7 +478,9 @@ class _ControlScreenState extends State<ControlScreen>
 
   Widget _buildPrimaryControls(
     ConnectionService connection,
+    PracticeTimerService timerService,
     dynamic bpm,
+    double currentBpm,
     dynamic timeSig,
     dynamic clickSub,
   ) {
@@ -463,62 +490,269 @@ class _ControlScreenState extends State<ControlScreen>
           physics: const BouncingScrollPhysics(),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.center,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    BpmDial(
-                      value: (bpm?.value ?? 120.0).roundToDouble(),
-                      min: bpm?.min ?? 40.0,
-                      max: bpm?.max ?? 300.0,
-                      step: 1.0,
-                      onChanged: (v) => connection.updateLocalParameterValue(
-                        'internal_bpm',
-                        v.roundToDouble(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Prominent BPM Header & Metro Style Ruler Selector
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${currentBpm.round()}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 64,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -1.0,
+                        ),
                       ),
-                      onChangedEnd: (v) => connection.setParameter(
-                        'internal_bpm',
-                        v.roundToDouble(),
+                      const Text(
+                        'BPM',
+                        style: TextStyle(
+                          color: Color(0xFF00FF88),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 3.0,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    SignaturePicker(
-                      currentNumerator: (timeSig?.value ?? 4.0).round(),
-                      onChanged: (n) =>
-                          connection.setParameter('time_sig_num', n.toDouble()),
-                    ),
-                    const SizedBox(height: 14),
-                    SubdivisionPicker(
-                      currentIndex: (clickSub?.value ?? 1.0).round(),
-                      onChanged: (i) => connection.setParameter(
-                        'click_subdivision',
-                        i.toDouble(),
+                      const SizedBox(height: 8),
+                      BpmRulerSelector(
+                        bpm: currentBpm,
+                        minBpm: bpm?.min ?? 30.0,
+                        maxBpm: bpm?.max ?? 300.0,
+                        onChanged: (v) {
+                          connection.updateLocalParameterValue(
+                            'internal_bpm',
+                            v,
+                          );
+                          connection.setParameter('internal_bpm', v);
+                        },
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  SignaturePicker(
+                    currentNumerator: (timeSig?.value ?? 4.0).round(),
+                    onChanged: (n) =>
+                        connection.setParameter('time_sig_num', n.toDouble()),
+                  ),
+                  const SizedBox(height: 14),
+                  SubdivisionPicker(
+                    currentIndex: (clickSub?.value ?? 1.0).round(),
+                    onChanged: (i) => connection.setParameter(
+                      'click_subdivision',
+                      i.toDouble(),
                     ),
-                    const SizedBox(height: 14),
-                    _buildHistoryBarsControl(
-                      connection,
-                      connection.parameters['bars_window'],
-                    ),
-                    const SizedBox(height: 14),
-                    _buildToleranceControl(
-                      connection,
-                      connection.parameters['tolerance_ms'],
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 14),
+                  _buildHistoryBarsControl(
+                    connection,
+                    connection.parameters['bars_window'],
+                  ),
+                  const SizedBox(height: 14),
+                  _buildToleranceControl(
+                    connection,
+                    connection.parameters['tolerance_ms'],
+                  ),
+                ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  void _showPracticeSetupModal(
+    BuildContext context,
+    ConnectionService connection,
+    PracticeTimerService timerService,
+    double currentBpm,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return PracticeSetupModal(
+          currentBpm: currentBpm,
+          onStart: (durationSecs, hasEndBpm, endBpm) {
+            timerService.configure(
+              durationSeconds: durationSecs,
+              hasEndBpm: hasEndBpm,
+              startBpm: currentBpm,
+              endBpm: endBpm,
+              onBpmChanged: (newBpm) {
+                connection.setParameter('internal_bpm', newBpm);
+              },
+            );
+            timerService.startPractice();
+          },
+        );
+      },
+    );
+  }
+
+  // ── Dedicated Practice Mode View ─────────────────────────────────
+  Widget _buildPracticeModeView(
+    ConnectionService connection,
+    PracticeTimerService timerService,
+  ) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0a0c10),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // Header Badge
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00FF88).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFF00FF88).withValues(alpha: 0.5),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.fitness_center_rounded,
+                      color: Color(0xFF00FF88),
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'PRACTICE MODE ACTIVE',
+                      style: TextStyle(
+                        color: Color(0xFF00FF88),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 2.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Countdown Timer Display (Metro Style Ruler + Prominent Text)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    timerService.formattedRemainingTime,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 84,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -2.0,
+                    ),
+                  ),
+                  const Text(
+                    'TIME REMAINING',
+                    style: TextStyle(
+                      color: Color(0xFF8b92a8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 3.0,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  PracticeTimerRulerDisplay(
+                    totalDurationSeconds: timerService.totalDurationSeconds,
+                    remainingSeconds: timerService.remainingSeconds,
+                    isInteractive: false,
+                  ),
+                ],
+              ),
+
+              // Current Live BPM Display
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF141722),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFF252a3a),
+                    width: 1.5,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      '${timerService.currentBpm.round()}',
+                      style: const TextStyle(
+                        color: Color(0xFF00FF88),
+                        fontSize: 56,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'CURRENT BPM',
+                          style: TextStyle(
+                            color: Color(0xFF8b92a8),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2.0,
+                          ),
+                        ),
+                        if (timerService.hasEndBpm) ...[
+                          const SizedBox(width: 8),
+                          Icon(
+                            timerService.endBpm >= timerService.startBpm
+                                ? Icons.trending_up_rounded
+                                : Icons.trending_down_rounded,
+                            color: const Color(0xFF38bdf8),
+                            size: 16,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Prominent Stop Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF1744),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(Icons.stop_rounded, size: 28),
+                  label: const Text(
+                    'STOP PRACTICE',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.0,
+                    ),
+                  ),
+                  onPressed: () {
+                    HapticFeedback.heavyImpact();
+                    timerService.stopPractice();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -656,7 +890,7 @@ class _ControlScreenState extends State<ControlScreen>
           child: SliderTheme(
             data: SliderThemeData(
               activeTrackColor: const Color(0xFF00FF88),
-              inactiveTrackColor: const Color(0xFF1e2235),
+              inactiveTrackColor: const Color(0xFF1e2e35),
               thumbColor: const Color(0xFF00FF88),
               overlayColor: const Color(0xFF00FF88).withValues(alpha: 0.2),
               trackHeight: 4,
@@ -686,6 +920,8 @@ class _ControlScreenState extends State<ControlScreen>
 
   Widget _buildFooterActions(
     ConnectionService connection,
+    PracticeTimerService timerService,
+    double currentBpm,
     Map<String, dynamic> params,
   ) {
     final clickEnabled = params['click_enabled'];
@@ -702,6 +938,50 @@ class _ControlScreenState extends State<ControlScreen>
       ),
       child: Row(
         children: [
+          // Practice Mode Button
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              _showPracticeSetupModal(
+                context,
+                connection,
+                timerService,
+                currentBpm,
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00FF88).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF00FF88).withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.timer_rounded,
+                    color: Color(0xFF00FF88),
+                    size: 18,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'PRACTICE',
+                    style: TextStyle(
+                      color: Color(0xFF00FF88),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
           // Metronome Quick Toggle
           Expanded(
             child: GestureDetector(
@@ -824,7 +1104,7 @@ class _ControlScreenState extends State<ControlScreen>
           GestureDetector(
             onTap: () => _showOptionsModal(context, connection),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFF38bdf8).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
@@ -833,21 +1113,7 @@ class _ControlScreenState extends State<ControlScreen>
                   width: 1.5,
                 ),
               ),
-              child: const Row(
-                children: [
-                  Icon(Icons.tune_rounded, color: Color(0xFF38bdf8), size: 18),
-                  SizedBox(width: 6),
-                  Text(
-                    'OPTIONS',
-                    style: TextStyle(
-                      color: Color(0xFF38bdf8),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ],
-              ),
+              child: const Icon(Icons.tune_rounded, color: Color(0xFF38bdf8), size: 18),
             ),
           ),
         ],
