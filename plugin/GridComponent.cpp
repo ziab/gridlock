@@ -205,9 +205,12 @@ void GridComponent::paint (juce::Graphics &g)
             {
                 // Prominent Bar Boundary Line & Ruler Label
                 g.setColour (juce::Colour (0xff38bdf8)); // Bright Sky Blue Bar Line
-                g.drawVerticalLine (static_cast<int> (x), 0.0f, boundsHeight - footerHeight);
+                const int rawBarIdx = static_cast<int> (std::floor (tick / barPpqInterval));
+                int wrappedBarIdx = rawBarIdx % barsWindow;
+                if (wrappedBarIdx < 0)
+                    wrappedBarIdx += barsWindow;
+                const int barNumber = wrappedBarIdx + 1;
 
-                const int barNumber = static_cast<int> (std::floor (tick / barPpqInterval)) + 1;
                 g.setFont (juce::Font (12.0f, juce::Font::bold));
                 g.drawText ("Bar " + juce::String (barNumber),
                             juce::Rectangle<float> (x + 4.0f, 0.0f, 60.0f, rulerHeight),
