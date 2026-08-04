@@ -62,7 +62,8 @@ class _ControlScreenState extends State<ControlScreen>
         setState(() {
           _discovering = false;
           if (!success) {
-            _errorMessage = 'Found Gridlock at ${result.ip} but connection failed';
+            _errorMessage =
+                'Found Gridlock at ${result.ip} but connection failed';
           }
         });
       }
@@ -118,7 +119,9 @@ class _ControlScreenState extends State<ControlScreen>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF00FF88).withValues(alpha: 0.2),
+                            color: const Color(
+                              0xFF00FF88,
+                            ).withValues(alpha: 0.2),
                             blurRadius: 20,
                           ),
                         ],
@@ -159,17 +162,15 @@ class _ControlScreenState extends State<ControlScreen>
                   height: 24,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Color(0xFF00FF88)),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF00FF88),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
                   'Searching for Gridlock on your network…',
-                  style: TextStyle(
-                    color: Color(0xFF6b7280),
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Color(0xFF6b7280), fontSize: 14),
                 ),
               ],
               if (_errorMessage != null) ...[
@@ -272,7 +273,10 @@ class _ControlScreenState extends State<ControlScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1a1d2e),
-        title: const Text('Manual Connection', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Manual Connection',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,11 +306,17 @@ class _ControlScreenState extends State<ControlScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Connect', style: TextStyle(color: Color(0xFF38bdf8))),
+            child: const Text(
+              'Connect',
+              style: TextStyle(color: Color(0xFF38bdf8)),
+            ),
           ),
         ],
       ),
@@ -387,10 +397,11 @@ class _ControlScreenState extends State<ControlScreen>
                   : const Color(0xFFFF1744),
               boxShadow: [
                 BoxShadow(
-                  color: (connection.isConnected
-                          ? const Color(0xFF00c853)
-                          : const Color(0xFFFF1744))
-                      .withValues(alpha: 0.5),
+                  color:
+                      (connection.isConnected
+                              ? const Color(0xFF00c853)
+                              : const Color(0xFFFF1744))
+                          .withValues(alpha: 0.5),
                   blurRadius: 6,
                 ),
               ],
@@ -410,7 +421,11 @@ class _ControlScreenState extends State<ControlScreen>
           const Spacer(),
           IconButton(
             tooltip: 'Clear Grid',
-            icon: const Icon(Icons.cleaning_services_rounded, color: Color(0xFF00FF88), size: 18),
+            icon: const Icon(
+              Icons.cleaning_services_rounded,
+              color: Color(0xFF00FF88),
+              size: 18,
+            ),
             onPressed: () {
               HapticFeedback.mediumImpact();
               connection.clearGrid();

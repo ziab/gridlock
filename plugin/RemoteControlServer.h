@@ -1,10 +1,10 @@
 #pragma once
 
-#include <juce_core/juce_core.h>
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_core/juce_core.h>
 #include <memory>
-#include <vector>
 #include <mutex>
+#include <vector>
 
 /**
  * RemoteControlServer — enables a Flutter companion app on the same LAN to
@@ -20,40 +20,35 @@
  *             On param Δ   → pushes {"type":"changed","id":"<paramId>","value":<float>}
  *             Heartbeat    → pushes {"type":"ping"} every 2 s.
  */
-class RemoteControlServer : private juce::Thread,
-                             private juce::Timer
+class RemoteControlServer : private juce::Thread, private juce::Timer
 {
-public:
-    explicit RemoteControlServer (juce::AudioProcessorValueTreeState& apvts,
-                                  int wsPort  = 9876,
-                                  int udpPort = 9877);
-    ~RemoteControlServer() override;
+  public:
+    explicit RemoteControlServer (juce::AudioProcessorValueTreeState &apvts, int wsPort = 9876, int udpPort = 9877);
+    ~RemoteControlServer () override;
 
-    void start();
-    void stop();
+    void start ();
+    void stop ();
 
-private:
+  private:
     // ── Thread (WebSocket accept loop) ──────────────────────────────
-    void run() override;
+    void run () override;
 
     // ── Timer (parameter change polling + heartbeat) ────────────────
-    void timerCallback() override;
+    void timerCallback () override;
 
     // ── UDP Discovery ───────────────────────────────────────────────
-    void runDiscoveryListener();
+    void runDiscoveryListener ();
 
     // ── WebSocket helpers ───────────────────────────────────────────
-    bool performWebSocketHandshake (juce::StreamingSocket& client);
-    juce::String readWebSocketTextFrame (juce::StreamingSocket& client);
-    bool sendWebSocketTextFrame (juce::StreamingSocket& client,
-                                 const juce::String& text);
-    void handleClientMessage (juce::StreamingSocket& client,
-                               const juce::String& message);
-    juce::String buildFullStateJson() const;
-    void broadcastToClients (const juce::String& json);
+    bool performWebSocketHandshake (juce::StreamingSocket &client);
+    juce::String readWebSocketTextFrame (juce::StreamingSocket &client);
+    bool sendWebSocketTextFrame (juce::StreamingSocket &client, const juce::String &text);
+    void handleClientMessage (juce::StreamingSocket &client, const juce::String &message);
+    juce::String buildFullStateJson () const;
+    void broadcastToClients (const juce::String &json);
 
     // ── Members ─────────────────────────────────────────────────────
-    juce::AudioProcessorValueTreeState& apvts;
+    juce::AudioProcessorValueTreeState &apvts;
 
     int wsPort;
     int udpPort;

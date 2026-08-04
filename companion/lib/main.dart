@@ -15,12 +15,14 @@ void main() {
   ]);
 
   // Dark status bar to match the app theme
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Color(0xFF0a0c10),
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: Color(0xFF0a0c10),
-    systemNavigationBarIconBrightness: Brightness.light,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Color(0xFF0a0c10),
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Color(0xFF0a0c10),
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
 
   runApp(const GridlockCompanionApp());
 }
@@ -44,9 +46,7 @@ class GridlockCompanionApp extends StatelessWidget {
             surface: Color(0xFF141722),
             error: Color(0xFFFF1744),
           ),
-          textTheme: GoogleFonts.interTextTheme(
-            ThemeData.dark().textTheme,
-          ),
+          textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
           useMaterial3: true,
         ),
         home: const ControlScreen(),

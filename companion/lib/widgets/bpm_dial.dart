@@ -56,8 +56,10 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
     // Vertical drag: up = increase, down = decrease
     final dy = _dragStartPos.dy - details.localPosition.dy;
     final sensitivity = (widget.max - widget.min) / 300.0;
-    final newValue = (_dragStartValue + dy * sensitivity)
-        .clamp(widget.min, widget.max);
+    final newValue = (_dragStartValue + dy * sensitivity).clamp(
+      widget.min,
+      widget.max,
+    );
     final snapped = (newValue / widget.step).round() * widget.step;
     if ((snapped - widget.value).abs() >= widget.step * 0.5) {
       widget.onChanged(snapped);
@@ -95,16 +97,20 @@ class _BpmDialState extends State<BpmDial> with SingleTickerProviderStateMixin {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
           ),
           TextButton(
             onPressed: () {
               final parsed = double.tryParse(controller.text);
               if (parsed != null) Navigator.pop(context, parsed);
             },
-            child: const Text('Set',
-                style: TextStyle(color: Color(0xFF00FF88))),
+            child: const Text(
+              'Set',
+              style: TextStyle(color: Color(0xFF00FF88)),
+            ),
           ),
         ],
       ),
@@ -192,11 +198,7 @@ class _BpmArcPainter extends CustomPainter {
   final double min;
   final double max;
 
-  _BpmArcPainter({
-    required this.value,
-    required this.min,
-    required this.max,
-  });
+  _BpmArcPainter({required this.value, required this.min, required this.max});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -247,11 +249,7 @@ class _BpmArcPainter extends CustomPainter {
       center.dx + radius * math.cos(dotAngle),
       center.dy + radius * math.sin(dotAngle),
     );
-    canvas.drawCircle(
-      dotPos,
-      5,
-      Paint()..color = Colors.white,
-    );
+    canvas.drawCircle(dotPos, 5, Paint()..color = Colors.white);
   }
 
   @override

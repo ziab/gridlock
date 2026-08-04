@@ -71,11 +71,7 @@ class ConnectionService extends ChangeNotifier {
   void setParameter(String id, double value) {
     if (!_connected || _channel == null) return;
 
-    final msg = jsonEncode({
-      'type': 'set',
-      'id': id,
-      'value': value,
-    });
+    final msg = jsonEncode({'type': 'set', 'id': id, 'value': value});
     _channel!.sink.add(msg);
 
     // Optimistic update

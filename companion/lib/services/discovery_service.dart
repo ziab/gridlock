@@ -32,9 +32,7 @@ class DiscoveryService {
           if (datagram != null) {
             final reply = String.fromCharCodes(datagram.data).trim();
             if (reply.startsWith(_replyPrefix)) {
-              final wsPort = int.tryParse(
-                reply.substring(_replyPrefix.length),
-              );
+              final wsPort = int.tryParse(reply.substring(_replyPrefix.length));
               if (wsPort != null && !completer.isCompleted) {
                 completer.complete((
                   ip: datagram.address.address,

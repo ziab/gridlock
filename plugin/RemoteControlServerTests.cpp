@@ -1,65 +1,85 @@
-#include <juce_core/juce_core.h>
-#include <juce_audio_processors/juce_audio_processors.h>
 #include "RemoteControlServer.h"
-#include <iostream>
+
 #include <cassert>
-#include <thread>
 #include <chrono>
+#include <iostream>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_core/juce_core.h>
+#include <thread>
 
 // Minimal dummy AudioProcessor for APVTS testing
 class DummyAudioProcessor : public juce::AudioProcessor
 {
-public:
-    DummyAudioProcessor()
-        : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true))
-    {}
+  public:
+    DummyAudioProcessor ()
+        : AudioProcessor (BusesProperties ().withOutput ("Output", juce::AudioChannelSet::stereo (), true))
+    {
+    }
 
-    const juce::String getName() const override { return "DummyProcessor"; }
+    const juce::String getName () const override
+    {
+        return "DummyProcessor";
+    }
     void prepareToPlay (double, int) override {}
-    void releaseResources() override {}
-    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override {}
-    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
-    bool hasEditor() const override { return false; }
-    bool acceptsMidi() const override { return false; }
-    bool producesMidi() const override { return false; }
-    double getTailLengthSeconds() const override { return 0.0; }
-    int getNumPrograms() override { return 1; }
-    int getCurrentProgram() override { return 0; }
+    void releaseResources () override {}
+    void processBlock (juce::AudioBuffer<float> &, juce::MidiBuffer &) override {}
+    juce::AudioProcessorEditor *createEditor () override
+    {
+        return nullptr;
+    }
+    bool hasEditor () const override
+    {
+        return false;
+    }
+    bool acceptsMidi () const override
+    {
+        return false;
+    }
+    bool producesMidi () const override
+    {
+        return false;
+    }
+    double getTailLengthSeconds () const override
+    {
+        return 0.0;
+    }
+    int getNumPrograms () override
+    {
+        return 1;
+    }
+    int getCurrentProgram () override
+    {
+        return 0;
+    }
     void setCurrentProgram (int) override {}
-    const juce::String getProgramName (int) override { return {}; }
-    void changeProgramName (int, const juce::String&) override {}
-    void getStateInformation (juce::MemoryBlock&) override {}
-    void setStateInformation (const void*, int) override {}
+    const juce::String getProgramName (int) override
+    {
+        return {};
+    }
+    void changeProgramName (int, const juce::String &) override {}
+    void getStateInformation (juce::MemoryBlock &) override {}
+    void setStateInformation (const void *, int) override {}
 };
 
-static juce::AudioProcessorValueTreeState::ParameterLayout createTestLayout()
+static juce::AudioProcessorValueTreeState::ParameterLayout createTestLayout ()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID { "internal_bpm", 1 },
-        "Internal BPM",
-        juce::NormalisableRange<float> (40.0f, 300.0f, 0.1f),
-        120.0f
-    ));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{"internal_bpm", 1}, "Internal BPM",
+                                                                   juce::NormalisableRange<float> (40.0f, 300.0f, 0.1f),
+                                                                   120.0f));
 
-    params.push_back (std::make_unique<juce::AudioParameterInt> (
-        juce::ParameterID { "time_sig_num", 1 },
-        "Time Sig Numerator",
-        2, 12, 4
-    ));
+    params.push_back (std::make_unique<juce::AudioParameterInt> (juce::ParameterID{"time_sig_num", 1},
+                                                                 "Time Sig Numerator", 2, 12, 4));
 
-    params.push_back (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID { "subdivision", 1 },
-        "Grid Subdivision",
-        juce::StringArray { "1/8", "1/8T", "1/16", "1/16T", "1/32" },
-        2
-    ));
+    params.push_back (
+        std::make_unique<juce::AudioParameterChoice> (juce::ParameterID{"subdivision", 1}, "Grid Subdivision",
+                                                      juce::StringArray{"1/8", "1/8T", "1/16", "1/16T", "1/32"}, 2));
 
-    return { params.begin(), params.end() };
+    return {params.begin (), params.end ()};
 }
 
-int main (int argc, char* argv[])
+int main (int argc, char *argv[])
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
 
@@ -69,10 +89,10 @@ int main (int argc, char* argv[])
     const int testUdpPort = 9887;
 
     DummyAudioProcessor processor;
-    juce::AudioProcessorValueTreeState apvts (processor, nullptr, "TestParams", createTestLayout());
+    juce::AudioProcessorValueTreeState apvts (processor, nullptr, "TestParams", createTestLayout ());
 
     RemoteControlServer server (apvts, testWsPort, testUdpPort);
-    server.start();
+    server.start ();
 
     std::this_thread::sleep_for (std::chrono::milliseconds (300));
 
@@ -83,9 +103,7 @@ int main (int argc, char* argv[])
         clientUdp.bindToPort (0, "127.0.0.1");
 
         juce::String probe = "GRIDLOCK_DISCOVER";
-        int sent = clientUdp.write ("127.0.0.1", testUdpPort,
-                                   probe.toRawUTF8(),
-                                   probe.getNumBytesAsUTF8());
+        int sent = clientUdp.write ("127.0.0.1", testUdpPort, probe.toRawUTF8 (), probe.getNumBytesAsUTF8 ());
         assert (sent > 0);
 
         char replyBuf[256] = {};
@@ -114,7 +132,7 @@ int main (int argc, char* argv[])
                                 "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
                                 "Sec-WebSocket-Version: 13\r\n\r\n";
 
-    clientSocket.write (handshakeReq.toRawUTF8(), handshakeReq.getNumBytesAsUTF8());
+    clientSocket.write (handshakeReq.toRawUTF8 (), handshakeReq.getNumBytesAsUTF8 ());
 
     clientSocket.waitUntilReady (true, 1000);
     char headerBuf[1024] = {};
@@ -142,47 +160,47 @@ int main (int argc, char* argv[])
     }
 
     std::vector<char> payload (payloadLen + 1, 0);
-    clientSocket.read (payload.data(), payloadLen, false);
+    clientSocket.read (payload.data (), payloadLen, false);
 
-    auto parsedState = juce::JSON::parse (juce::String (payload.data()));
-    assert (parsedState.isObject());
-    assert (parsedState.getDynamicObject()->getProperty ("type").toString() == "state");
+    auto parsedState = juce::JSON::parse (juce::String (payload.data ()));
+    assert (parsedState.isObject ());
+    assert (parsedState.getDynamicObject ()->getProperty ("type").toString () == "state");
     std::cout << " PASSED" << std::endl;
 
     // ── Test 4: Parameter Set via WebSocket ─────────────────────────
     std::cout << "[Test 4] Testing parameter set command..." << std::flush;
     {
         juce::String setMsg = "{\"type\":\"set\",\"id\":\"internal_bpm\",\"value\":145.0}";
-        auto utf8Msg = setMsg.toUTF8();
-        size_t len = setMsg.getNumBytesAsUTF8();
+        auto utf8Msg = setMsg.toUTF8 ();
+        size_t len = setMsg.getNumBytesAsUTF8 ();
 
         std::vector<uint8_t> setFrame;
-        setFrame.push_back (0x81); // FIN + Text
+        setFrame.push_back (0x81);                              // FIN + Text
         setFrame.push_back (0x80 | static_cast<uint8_t> (len)); // Masked flag + length
-        uint8_t maskKey[4] = { 0x12, 0x34, 0x56, 0x78 };
-        setFrame.insert (setFrame.end(), maskKey, maskKey + 4);
+        uint8_t maskKey[4] = {0x12, 0x34, 0x56, 0x78};
+        setFrame.insert (setFrame.end (), maskKey, maskKey + 4);
 
         for (size_t i = 0; i < len; ++i)
             setFrame.push_back (static_cast<uint8_t> (utf8Msg[i]) ^ maskKey[i % 4]);
 
-        clientSocket.write (setFrame.data(), static_cast<int> (setFrame.size()));
-        
+        clientSocket.write (setFrame.data (), static_cast<int> (setFrame.size ()));
+
         for (int i = 0; i < 10; ++i)
         {
-            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+            juce::MessageManager::getInstance ()->runDispatchLoopUntil (50);
             std::this_thread::sleep_for (std::chrono::milliseconds (10));
         }
 
-        auto* bpmParam = apvts.getParameter ("internal_bpm");
+        auto *bpmParam = apvts.getParameter ("internal_bpm");
         assert (bpmParam != nullptr);
-        float currentBpm = bpmParam->convertFrom0to1 (bpmParam->getValue());
+        float currentBpm = bpmParam->convertFrom0to1 (bpmParam->getValue ());
         assert (std::abs (currentBpm - 145.0f) < 0.2f);
     }
     std::cout << " PASSED" << std::endl;
 
     // ── Cleanup ─────────────────────────────────────────────────────
-    clientSocket.close();
-    server.stop();
+    clientSocket.close ();
+    server.stop ();
 
     std::cout << "=== ALL REMOTE CONTROL SERVER INTEGRATION TESTS PASSED ===" << std::endl;
     return 0;

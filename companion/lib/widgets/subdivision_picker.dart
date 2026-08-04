@@ -36,10 +36,7 @@ class SubdivisionPicker extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFF0f1118),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: const Color(0xFF2d3245),
-              width: 1.5,
-            ),
+            border: Border.all(color: const Color(0xFF2d3245), width: 1.5),
           ),
           padding: const EdgeInsets.all(4),
           child: Row(
@@ -74,8 +71,9 @@ class SubdivisionPicker extends StatelessWidget {
                       boxShadow: isActive
                           ? [
                               BoxShadow(
-                                color: const Color(0xFF38bdf8)
-                                    .withValues(alpha: 0.15),
+                                color: const Color(
+                                  0xFF38bdf8,
+                                ).withValues(alpha: 0.15),
                                 blurRadius: 12,
                               ),
                             ]
@@ -88,8 +86,9 @@ class SubdivisionPicker extends StatelessWidget {
                             ? const Color(0xFF38bdf8)
                             : const Color(0xFF6b7280),
                         fontSize: 16,
-                        fontWeight:
-                            isActive ? FontWeight.w800 : FontWeight.w500,
+                        fontWeight: isActive
+                            ? FontWeight.w800
+                            : FontWeight.w500,
                       ),
                     ),
                   ),

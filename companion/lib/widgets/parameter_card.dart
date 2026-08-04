@@ -34,10 +34,7 @@ class ParameterCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF141722),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFF252a3a),
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0xFF252a3a), width: 1),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
@@ -99,8 +96,11 @@ class ParameterCard extends StatelessWidget {
   }
 
   Widget _buildSlider() {
-    final rawDivisions = (step > 0 && max > min) ? ((max - min) / step).round() : 0;
-    final divisions = (paramType == 'int' && rawDivisions > 0 && rawDivisions <= 200)
+    final rawDivisions = (step > 0 && max > min)
+        ? ((max - min) / step).round()
+        : 0;
+    final divisions =
+        (paramType == 'int' && rawDivisions > 0 && rawDivisions <= 200)
         ? rawDivisions
         : null;
 

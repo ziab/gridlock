@@ -1,25 +1,25 @@
 #pragma once
 
-#include <juce_gui_basics/juce_gui_basics.h>
-#include <juce_audio_processors/juce_audio_processors.h>
-#include "PluginProcessor.h"
 #include "GridComponent.h"
+#include "PluginProcessor.h"
 
-class MidiGridAnalyzerAudioProcessorEditor  : public juce::AudioProcessorEditor,
-                                              private juce::Timer
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_gui_basics/juce_gui_basics.h>
+
+class MidiGridAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
-public:
-    explicit MidiGridAnalyzerAudioProcessorEditor (MidiGridAnalyzerAudioProcessor&);
-    ~MidiGridAnalyzerAudioProcessorEditor() override;
+  public:
+    explicit MidiGridAnalyzerAudioProcessorEditor (MidiGridAnalyzerAudioProcessor &);
+    ~MidiGridAnalyzerAudioProcessorEditor () override;
 
-    void paint (juce::Graphics&) override;
-    void resized() override;
-    void parentHierarchyChanged() override;
+    void paint (juce::Graphics &) override;
+    void resized () override;
+    void parentHierarchyChanged () override;
 
-private:
-    void timerCallback() override;
+  private:
+    void timerCallback () override;
 
-    MidiGridAnalyzerAudioProcessor& processorRef;
+    MidiGridAnalyzerAudioProcessor &processorRef;
 
     GridComponent gridComponent;
 
@@ -35,30 +35,30 @@ private:
     juce::ComboBox clickSoundComboBox;
     juce::Slider clickVolumeSlider;
     juce::Slider clickPanSlider;
-    juce::TextButton clickToggleButton{ "CLICK ON" };
-    juce::TextButton pauseButton{ "PAUSE" };
-    juce::TextButton showMsButton{ "MS OFFSETS" };
-    juce::TextButton showVelButton{ "VELOCITY" };
-    juce::TextButton showNoteNumButton{ "NOTE #" };
-    juce::TextButton testButton{ "TEST MODE" };
-    juce::TextButton clearButton{ "Clear Grid" };
+    juce::TextButton clickToggleButton{"CLICK ON"};
+    juce::TextButton pauseButton{"PAUSE"};
+    juce::TextButton showMsButton{"MS OFFSETS"};
+    juce::TextButton showVelButton{"VELOCITY"};
+    juce::TextButton showNoteNumButton{"NOTE #"};
+    juce::TextButton testButton{"TEST MODE"};
+    juce::TextButton clearButton{"Clear Grid"};
 
     // Labels
-    juce::Label barsLabel{ {}, "Bars:" };
-    juce::Label subdivisionLabel{ {}, "Subdiv:" };
-    juce::Label toleranceLabel{ {}, "Tolerance:" };
-    juce::Label latencyLabel{ {}, "Latency:" };
-    juce::Label velocityLabel{ {}, "Min Vel:" };
-    juce::Label bpmLabel{ {}, "BPM:" };
-    juce::Label timeSigLabel{ {}, "Time Sig:" };
-    juce::Label clickSubLabel{ {}, "Click Sub:" };
-    juce::Label clickSoundLabel{ {}, "Click Sound:" };
-    juce::Label clickVolLabel{ {}, "Click Vol:" };
-    juce::Label clickPanLabel{ {}, "Click Pan:" };
+    juce::Label barsLabel{{}, "Bars:"};
+    juce::Label subdivisionLabel{{}, "Subdiv:"};
+    juce::Label toleranceLabel{{}, "Tolerance:"};
+    juce::Label latencyLabel{{}, "Latency:"};
+    juce::Label velocityLabel{{}, "Min Vel:"};
+    juce::Label bpmLabel{{}, "BPM:"};
+    juce::Label timeSigLabel{{}, "Time Sig:"};
+    juce::Label clickSubLabel{{}, "Click Sub:"};
+    juce::Label clickSoundLabel{{}, "Click Sound:"};
+    juce::Label clickVolLabel{{}, "Click Vol:"};
+    juce::Label clickPanLabel{{}, "Click Pan:"};
 
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
-    using SliderAttachment   = juce::AudioProcessorValueTreeState::SliderAttachment;
-    using ButtonAttachment   = juce::AudioProcessorValueTreeState::ButtonAttachment;
+    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
+    using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
 
     std::unique_ptr<ComboBoxAttachment> barsAttachment;
     std::unique_ptr<ComboBoxAttachment> subdivisionAttachment;

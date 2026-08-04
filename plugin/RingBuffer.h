@@ -1,46 +1,53 @@
 #pragma once
-#include <juce_core/juce_core.h>
-#include <array>
 #include "HitEvent.h"
 
-template <size_t Capacity = 4096>
-class RingBuffer {
-public:
-    RingBuffer() : fifo(static_cast<int>(Capacity)) {}
+#include <array>
+#include <juce_core/juce_core.h>
 
-    bool push(const HitEvent& event) noexcept {
+template <size_t Capacity = 4096> class RingBuffer
+{
+  public:
+    RingBuffer () : fifo (static_cast<int> (Capacity)) {}
+
+    bool push (const HitEvent &event) noexcept
+    {
         int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
-        fifo.prepareToWrite(1, start1, size1, start2, size2);
+        fifo.prepareToWrite (1, start1, size1, start2, size2);
 
-        if (size1 > 0) {
-            buffer[static_cast<size_t>(start1)] = event;
-            fifo.finishedWrite(1);
+        if (size1 > 0)
+        {
+            buffer[static_cast<size_t> (start1)] = event;
+            fifo.finishedWrite (1);
             return true;
         }
         return false; // Buffer full
     }
 
-    bool pop(HitEvent& event) noexcept {
+    bool pop (HitEvent &event) noexcept
+    {
         int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
-        fifo.prepareToRead(1, start1, size1, start2, size2);
+        fifo.prepareToRead (1, start1, size1, start2, size2);
 
-        if (size1 > 0) {
-            event = buffer[static_cast<size_t>(start1)];
-            fifo.finishedRead(1);
+        if (size1 > 0)
+        {
+            event = buffer[static_cast<size_t> (start1)];
+            fifo.finishedRead (1);
             return true;
         }
         return false; // Buffer empty
     }
 
-    void reset() noexcept {
-        fifo.reset();
+    void reset () noexcept
+    {
+        fifo.reset ();
     }
 
-    int getNumReady() const noexcept {
-        return fifo.getNumReady();
+    int getNumReady () const noexcept
+    {
+        return fifo.getNumReady ();
     }
 
-private:
+  private:
     juce::AbstractFifo fifo;
     std::array<HitEvent, Capacity> buffer{};
 };
