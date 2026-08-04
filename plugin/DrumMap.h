@@ -49,9 +49,24 @@ struct LaneInfo
     std::vector<uint8_t> notes;
 };
 
-// Minimum interval (ms) between another hi-hat strike and a Note 46 (Open Tip) before it is accepted.
-// Hard hits produce a trailing Note 46 ~40-60ms after the edge trigger; this window suppresses that noise.
-static constexpr double kHiHatDebounceWindowMs = 100.0;
+// Velocity-dependent debounce for Note 46 (Open Hi-Hat Tip) ghost-note suppression.
+//
+// Hard open-hat hits arrive loud and legitimately after ~60ms.
+// Ghost retriggers are quiet (velocity ~7) and should be suppressed for the full 200ms window.
+//
+// The curve is quadratic: window = max - (max - min) * (velocity / 127)^2
+//   velocity = 127  -> ~60 ms  (loud, accept quickly)
+//   velocity =  64  -> ~164 ms
+//   velocity =   7  -> ~200 ms (quiet ghost, suppressed nearly always)
+static constexpr double kHiHatDebounceMinMs = 60.0;
+static constexpr double kHiHatDebounceMaxMs = 200.0;
+
+inline double hiHatDebounceWindowMs (uint8_t velocity) noexcept
+{
+    const double v = static_cast<double> (velocity) / 127.0; // normalise 0..1
+    const double t = v * v;                                  // quadratic - non-linear boost for loud hits
+    return kHiHatDebounceMaxMs - (kHiHatDebounceMaxMs - kHiHatDebounceMinMs) * t;
+}
 
 // Notes to exclude entirely from the grid display (currently no notes excluded)
 inline bool isExcluded (uint8_t note) noexcept

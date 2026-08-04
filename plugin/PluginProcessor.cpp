@@ -257,7 +257,7 @@ void MidiGridAnalyzerAudioProcessor::updateHostSyncAndPlayhead (float internalBp
     hostIsPlaying = (hostPlaying || !hostPpqValid) && !isPausedVal;
 }
 
-bool MidiGridAnalyzerAudioProcessor::shouldFilterHiHatTrigger (uint8_t noteNum, double nowMs)
+bool MidiGridAnalyzerAudioProcessor::shouldFilterHiHatTrigger (uint8_t noteNum, uint8_t velocity, double nowMs)
 {
     const bool isOtherHiHat = (noteNum == DrumMap::ClosedHiHatEdge || noteNum == DrumMap::ClosedHiHat ||
                                noteNum == DrumMap::PedalHiHat || noteNum == DrumMap::OpenHiHatEdge);
@@ -270,8 +270,10 @@ bool MidiGridAnalyzerAudioProcessor::shouldFilterHiHatTrigger (uint8_t noteNum, 
 
     if (noteNum == DrumMap::OpenHiHat)
     {
-        // Ignore secondary Note 46 re-trigger if it arrives within debouncing window of another hi-hat strike
-        if ((nowMs - lastOtherHiHatTimeMs) < kHiHatDebounceWindowMs)
+        // Velocity-dependent debounce: quiet notes (ghost retriggers) need the full window,
+        // loud notes are legitimate open-hat hits and need only the minimum window.
+        const double windowMs = DrumMap::hiHatDebounceWindowMs (velocity);
+        if ((nowMs - lastOtherHiHatTimeMs) < windowMs)
             return true;
     }
 
@@ -290,9 +292,10 @@ void MidiGridAnalyzerAudioProcessor::processIncomingMidi (const juce::MidiBuffer
             !DrumMap::isExcluded (static_cast<uint8_t> (msg.getNoteNumber ())))
         {
             const uint8_t noteNum = static_cast<uint8_t> (msg.getNoteNumber ());
+            const uint8_t velocity = static_cast<uint8_t> (msg.getVelocity ());
             const double nowMs = juce::Time::getMillisecondCounterHiRes ();
 
-            if (shouldFilterHiHatTrigger (noteNum, nowMs))
+            if (shouldFilterHiHatTrigger (noteNum, velocity, nowMs))
                 continue;
 
             const int sampleOffset = metadata.samplePosition;
