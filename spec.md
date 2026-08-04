@@ -140,7 +140,7 @@ struct HitEvent {
 
 ### 4.4 Centralized E-Kit Drum Map & Constants (`Source/DrumMap.h`)
 * **Single Source of Truth (`DrumMap.h`)**:
-  - Centralized General MIDI / Roland e-Kit constants: `Kick` (36), `SnareHead` (38), `SnareRim` (40), `ClosedHiHat` (42), `PedalHiHat` (44), `OpenHiHat` (46), `HighTom` (48), `MidTom` (45), `LowTom` (43), `Crash1` (49), `Ride` (51), `Crash2` (53).
+  - Centralized General MIDI / Roland e-Kit constants: `Kick` (36), `SnareHead` (38), `SnareRim` (40), `ClosedHiHat` (42), `PedalHiHat` (44), `OpenHiHat` (46), `HighTom` (48), `MidTom` (45), `LowTom` (43), `Crash1` (49), `Ride` (51), `Crash2` (53), `ChineseCymbal` (52), `SplashCymbal` (55), `Crash2Edge` (57), `CymbalEdge29` (29), `CymbalBell30` (30).
   - Standard drum lane layout `getStandardDrumLanes()` consumed directly by `GridComponent` and `PluginProcessor`. Zero magic note numbers in renderer or audio processor.
 
 ---

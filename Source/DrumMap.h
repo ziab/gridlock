@@ -7,6 +7,8 @@
 namespace DrumMap
 {
     // Standard General MIDI / Roland e-Kit Note Numbers
+    constexpr uint8_t CymbalEdge29      = 29; // Roland Cymbal Edge / Crash 2 Rim
+    constexpr uint8_t CymbalBell30      = 30; // Roland Cymbal Bell / Splash Rim
     constexpr uint8_t Kick              = 36; // C1
     constexpr uint8_t SnareHead         = 38; // D1
     constexpr uint8_t SnareRim          = 40; // E1
@@ -20,7 +22,11 @@ namespace DrumMap
     constexpr uint8_t LowTom            = 43; // G1
     constexpr uint8_t Crash1            = 49; // C#2
     constexpr uint8_t Ride              = 51; // D#2
+    constexpr uint8_t ChineseCymbal     = 52; // E2 (Chinese Cymbal)
     constexpr uint8_t Crash2            = 53; // F2
+    constexpr uint8_t SplashCymbal      = 55; // G2 (Splash Cymbal)
+    constexpr uint8_t Crash2Edge        = 57; // A2 (Crash 2 Edge)
+    constexpr uint8_t RideEdge          = 59; // B2 (Ride Edge)
 
     // Test Mode Velocity Synthesis Parameters
     namespace TestModeVelocity
@@ -45,7 +51,7 @@ namespace DrumMap
     inline const std::vector<LaneInfo>& getStandardDrumLanes()
     {
         static const std::vector<LaneInfo> lanes = {
-            { "CYMBALS", { Crash1, Ride, Crash2 } },
+            { "CYMBALS", { CymbalEdge29, CymbalBell30, Crash1, Ride, ChineseCymbal, Crash2, SplashCymbal, Crash2Edge, RideEdge } },
             { "HI-HAT",  { ClosedHiHatEdge, ClosedHiHat, PedalHiHat, OpenHiHatEdge, OpenHiHat } },
             { "KICK",    { Kick } },
             { "SNARE",   { SnareHead, SnareRim } },
