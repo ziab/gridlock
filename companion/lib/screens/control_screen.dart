@@ -639,16 +639,21 @@ class _ControlScreenState extends State<ControlScreen>
                           : const Color(0xFF6b7280),
                       size: 18,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      clickOn ? 'METRONOME ON' : 'METRONOME OFF',
-                      style: TextStyle(
-                        color: clickOn
-                            ? const Color(0xFF00c853)
-                            : const Color(0xFF6b7280),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          clickOn ? 'CLICK ON' : 'CLICK OFF',
+                          style: TextStyle(
+                            color: clickOn
+                                ? const Color(0xFF00c853)
+                                : const Color(0xFF6b7280),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -693,16 +698,21 @@ class _ControlScreenState extends State<ControlScreen>
                           : const Color(0xFF8b92a8),
                       size: 18,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      pausedOn ? 'PAUSED' : 'RUNNING',
-                      style: TextStyle(
-                        color: pausedOn
-                            ? const Color(0xFFFF1744)
-                            : const Color(0xFF8b92a8),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          pausedOn ? 'PAUSED' : 'RUNNING',
+                          style: TextStyle(
+                            color: pausedOn
+                                ? const Color(0xFFFF1744)
+                                : const Color(0xFF8b92a8),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
                       ),
                     ),
                   ],

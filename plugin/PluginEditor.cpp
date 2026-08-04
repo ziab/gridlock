@@ -7,6 +7,7 @@
 MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (MidiGridAnalyzerAudioProcessor &p)
     : AudioProcessorEditor (&p), processorRef (p)
 {
+    juce::Desktop::getInstance ().setScreenSaverAllowed (false);
     setResizable (true, true);
 
     // Dynamic screen-based window dimensions & bounds
@@ -242,6 +243,7 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
 
 MidiGridAnalyzerAudioProcessorEditor::~MidiGridAnalyzerAudioProcessorEditor ()
 {
+    juce::Desktop::getInstance ().setScreenSaverAllowed (true);
     stopTimer ();
 }
 

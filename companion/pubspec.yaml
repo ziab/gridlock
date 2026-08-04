@@ -12,6 +12,7 @@ dependencies:
   web_socket_channel: ^3.0.2
   provider: ^6.1.2
   google_fonts: ^6.2.1
+  wakelock_plus: ^1.2.8
 
 dev_dependencies:
   flutter_test:

@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'services/connection_service.dart';
 import 'screens/control_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Prevent display sleep while using the companion app on drum throne
+  WakelockPlus.enable();
 
   // Lock to portrait for a focused drum-throne experience
   SystemChrome.setPreferredOrientations([
