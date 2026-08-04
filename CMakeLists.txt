@@ -41,18 +41,18 @@ juce_add_plugin(MidiGridAnalyzer
 
 # Source files
 target_sources(MidiGridAnalyzer PRIVATE
-    Source/HitEvent.h
-    Source/RingBuffer.h
-    Source/ClickGenerator.h
-    Source/ClickGenerator.cpp
-    Source/RemoteControlServer.h
-    Source/RemoteControlServer.cpp
-    Source/PluginProcessor.h
-    Source/PluginProcessor.cpp
-    Source/GridComponent.h
-    Source/GridComponent.cpp
-    Source/PluginEditor.h
-    Source/PluginEditor.cpp
+    plugin/HitEvent.h
+    plugin/RingBuffer.h
+    plugin/ClickGenerator.h
+    plugin/ClickGenerator.cpp
+    plugin/RemoteControlServer.h
+    plugin/RemoteControlServer.cpp
+    plugin/PluginProcessor.h
+    plugin/PluginProcessor.cpp
+    plugin/GridComponent.h
+    plugin/GridComponent.cpp
+    plugin/PluginEditor.h
+    plugin/PluginEditor.cpp
 )
 
 # Link JUCE Modules and Embedded Binary Data
@@ -78,9 +78,9 @@ juce_add_console_app(RemoteControlServerTests
 )
 
 target_sources(RemoteControlServerTests PRIVATE
-    Source/RemoteControlServer.h
-    Source/RemoteControlServer.cpp
-    Source/RemoteControlServerTests.cpp
+    plugin/RemoteControlServer.h
+    plugin/RemoteControlServer.cpp
+    plugin/RemoteControlServerTests.cpp
 )
 
 target_link_libraries(RemoteControlServerTests PRIVATE
