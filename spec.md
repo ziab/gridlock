@@ -187,6 +187,168 @@ Add controls to `PluginEditor` for Metronome Toggle, Click Volume, Time Signatur
 
 1. **Standalone Metronome Timing**: Metronome click triggers must maintain sample-exact alignment with grid PPQ positions without drift over long practice sessions.
 2. **Audio Buffer Mixing**: Metronome click audio must sum cleanly into output channels without clipping or pop artifacts.
+3. **Remote Control Latency**: WebSocket parameter sync should feel instantaneous (<50 ms). The 10 Hz polling interval for parameter change detection is a tradeoff between responsiveness and CPU overhead.
+4. **UDP Broadcast Discovery**: May not work across subnets or on networks that block broadcast traffic. User can fall back to manual IP entry in future versions.
 
+---
 
+## 7. Remote Control Server (`Source/RemoteControlServer.h` / `.cpp`)
 
+### 7.1 Overview
+A lightweight network server embedded in the Standalone application that enables companion devices (phones, tablets) on the same LAN to remotely control APVTS parameters. **Active exclusively in Standalone mode** — bypassed when running as VST3/AU plugin.
+
+### 7.2 Discovery Protocol (UDP)
+
+| Field | Value |
+| :--- | :--- |
+| Transport | UDP Broadcast |
+| Port | `9877` |
+| Probe Message | `GRIDLOCK_DISCOVER` |
+| Response Format | `GRIDLOCK_HERE:<wsPort>` (e.g. `GRIDLOCK_HERE:9876`) |
+
+* The `DiscoveryListenerThread` binds to UDP port `9877` and listens for probe packets.
+* On receiving `GRIDLOCK_DISCOVER`, it replies directly to the sender's IP:port with `GRIDLOCK_HERE:9876`.
+* Probe interval on the client side: every 500 ms, with a configurable timeout (default 8–10 seconds).
+
+### 7.3 WebSocket Control Protocol
+
+| Field | Value |
+| :--- | :--- |
+| Transport | WebSocket (RFC 6455, text frames only) |
+| Default Port | `9876` |
+| Handshake | Standard HTTP Upgrade with SHA-1 accept key |
+
+#### Messages — Server → Client
+
+| Type | Payload | When |
+| :--- | :--- | :--- |
+| `state` | `{"type":"state","params":{"internal_bpm":{"value":120,"norm":0.308,"name":"Internal BPM","min":40,"max":300,"step":0.1,"paramType":"float"},...}}` | On initial connection |
+| `changed` | `{"type":"changed","id":"internal_bpm","value":140.0,"norm":0.385}` | When any parameter changes (10 Hz polling) |
+
+#### Messages — Client → Server
+
+| Type | Payload | Effect |
+| :--- | :--- | :--- |
+| `set` | `{"type":"set","id":"internal_bpm","value":140.0}` | Calls `param->setValueNotifyingHost()` with denormalized value |
+| `get_state` | `{"type":"get_state"}` | Triggers full state snapshot broadcast |
+
+#### Parameter Metadata in State Snapshot
+
+Each parameter object includes:
+* `value` — Current denormalized value
+* `norm` — Current normalized (0–1) value
+* `name` — Human-readable parameter name
+* `min`, `max`, `step` — Range info
+* `paramType` — One of: `float`, `int`, `bool`, `choice`
+* `options` — Array of choice labels (only for `choice` type)
+
+### 7.4 Architecture
+
+```
+┌──────────────────────────────────────────────┐
+│           RemoteControlServer                │
+│                                              │
+│  ┌─────────────────┐  ┌──────────────────┐   │
+│  │ Discovery Thread │  │ Accept Thread    │   │
+│  │ (UDP :9877)      │  │ (WS :9876)       │   │
+│  │                  │  │                  │   │
+│  │ Listens for      │  │ Accepts WS       │   │
+│  │ GRIDLOCK_DISCOVER│  │ connections,     │   │
+│  │ → replies with   │  │ sends state      │   │
+│  │   WS port        │  │ snapshot         │   │
+│  └─────────────────┘  └──────────────────┘   │
+│                                              │
+│  ┌──────────────────────────────────────┐    │
+│  │ Timer Callback (10 Hz)               │    │
+│  │ • Read client messages               │    │
+│  │ • Detect APVTS parameter changes     │    │
+│  │ • Push changed params to clients     │    │
+│  └──────────────────────────────────────┘    │
+│                                              │
+│            ↕ APVTS reference                 │
+└──────────────────────────────────────────────┘
+```
+
+---
+
+## 8. Flutter Companion App (`companion/`)
+
+### 8.1 Overview
+A mobile companion app (Android/iOS) that discovers the running Gridlock standalone on the same WiFi network, connects via WebSocket, and provides drum-throne-friendly remote control of metronome and analysis parameters.
+
+### 8.2 Tech Stack
+
+| Component | Technology |
+| :--- | :--- |
+| Framework | Flutter 3.x (Dart) |
+| State Management | Provider + ChangeNotifier |
+| Networking | `dart:io` (UDP), `web_socket_channel` (WebSocket) |
+| Typography | Google Fonts (Inter) |
+| Target Platforms | Android, iOS |
+
+### 8.3 Project Structure
+
+```
+companion/lib/
+├── main.dart                          # App entry, dark theme, Provider setup
+├── models/
+│   └── parameter.dart                 # RemoteParameter model (mirrors JUCE JSON)
+├── services/
+│   ├── discovery_service.dart         # UDP broadcast discovery
+│   └── connection_service.dart        # WebSocket client + bidirectional state sync
+├── screens/
+│   └── control_screen.dart            # Main UI (discovery view + control view)
+└── widgets/
+    ├── bpm_dial.dart                  # Large rotary BPM dial with arc indicator
+    ├── signature_picker.dart          # Segmented time signature chips
+    ├── subdivision_picker.dart        # Segmented click subdivision chips
+    └── parameter_card.dart            # Reusable slider/toggle/choice card
+```
+
+### 8.4 UI Design
+
+#### Control Hierarchy
+
+| Priority | Controls | Widget |
+| :--- | :--- | :--- |
+| **Primary (Top 55%)** | BPM | `BpmDial` — Rotary dial with arc, drag-to-adjust, tap-to-type |
+| **Primary** | Time Signature | `SignaturePicker` — Segmented chips: 2/4, 3/4, 4/4, 5/4, 6/8, 7/8 |
+| **Primary** | Click Subdivision | `SubdivisionPicker` — Segmented chips: Off, 1/4, 1/8, 1/16, Triplets |
+| **Secondary (Bottom 45%)** | All other params | `ParameterCard` grid — Slider, toggle, or choice variant |
+
+#### Secondary Parameters Exposed
+
+| Parameter ID | Card Label | Type |
+| :--- | :--- | :--- |
+| `click_enabled` | Metronome | Toggle |
+| `is_paused` | Pause | Toggle |
+| `click_volume` | Click Volume | Slider |
+| `click_pan` | Click Pan | Slider |
+| `click_sample_preset` | Click Sound | Choice chips |
+| `bars_window` | History Bars | Choice chips |
+| `subdivision` | Grid Subdiv | Choice chips |
+| `tolerance_ms` | Tolerance | Slider (suffix: ms) |
+| `latency_offset_ms` | Latency | Slider (suffix: ms) |
+| `min_velocity` | Min Velocity | Slider |
+| `show_ms_labels` | MS Offsets | Toggle |
+| `note_filter` | Display Mode | Choice chips |
+
+#### Parameters Excluded from Companion App
+* `show_velocity_labels` — UI display toggle (not useful from throne distance)
+* `show_note_numbers` — UI display toggle
+* `test_mode` — Debug/demo mode
+
+#### Theme
+* Dark palette matching JUCE app: `#0a0c10` (background), `#181b24` (header), `#141722` (cards)
+* Accent: Emerald Green `#00FF88` (primary), Sky Blue `#38bdf8` (secondary)
+* Haptic feedback on all interactions
+* Portrait-locked for drum throne ergonomics
+
+### 8.5 Connection Flow
+
+1. App launches → **Discovery Screen** with animated Gridlock logo
+2. Sends UDP broadcast `GRIDLOCK_DISCOVER` every 500 ms (timeout: 10 s)
+3. On response → connects WebSocket to `ws://<ip>:9876`
+4. On connect → receives full parameter state → transitions to **Control Screen**
+5. Bidirectional sync: changes on phone push to JUCE; changes on JUCE push to phone
+6. On disconnect → returns to Discovery Screen with retry option

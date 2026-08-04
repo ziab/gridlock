@@ -4,6 +4,7 @@
 #include "RingBuffer.h"
 #include "HitEvent.h"
 #include "ClickGenerator.h"
+#include "RemoteControlServer.h"
 
 class MidiGridAnalyzerAudioProcessor  : public juce::AudioProcessor
 {
@@ -61,6 +62,9 @@ private:
     int currentTimeSigNum{ 4 };
     bool hostIsPlaying{ false };
     bool isStandaloneMode{ false };
+
+    // Remote companion app server (standalone mode only)
+    std::unique_ptr<RemoteControlServer> remoteServer;
 
     double lastTestBeatTick{ -1.0 };
     juce::Random random;

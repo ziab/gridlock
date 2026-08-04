@@ -26,10 +26,19 @@ MidiGridAnalyzerAudioProcessor::MidiGridAnalyzerAudioProcessor()
             break;
         }
     }
+
+    // Start remote control server for companion app (standalone only)
+    if (isStandaloneMode)
+    {
+        remoteServer = std::make_unique<RemoteControlServer> (apvts);
+        remoteServer->start();
+    }
 }
 
 MidiGridAnalyzerAudioProcessor::~MidiGridAnalyzerAudioProcessor()
 {
+    if (remoteServer)
+        remoteServer->stop();
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcessor::createParameterLayout()

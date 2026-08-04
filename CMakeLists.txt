@@ -45,6 +45,8 @@ target_sources(MidiGridAnalyzer PRIVATE
     Source/RingBuffer.h
     Source/ClickGenerator.h
     Source/ClickGenerator.cpp
+    Source/RemoteControlServer.h
+    Source/RemoteControlServer.cpp
     Source/PluginProcessor.h
     Source/PluginProcessor.cpp
     Source/GridComponent.h
