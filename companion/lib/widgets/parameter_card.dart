@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 /// A reusable, dark-themed card for secondary parameters.
 ///
-/// Supports slider, toggle, and choice variants based on [paramType].
+/// Supports slider, toggle, and popup choice variants based on [paramType].
 class ParameterCard extends StatelessWidget {
   final String label;
   final String paramType; // 'float', 'int', 'bool', 'choice'
@@ -38,10 +38,10 @@ class ParameterCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFF252a3a), width: 1),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Header row
           Row(
@@ -49,6 +49,8 @@ class ParameterCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   label.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF8b92a8),
                     fontSize: 10,
@@ -62,15 +64,20 @@ class ParameterCard extends StatelessWidget {
                   _formatValue(),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           // Control
-          _buildControl(),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _buildControl(),
+            ),
+          ),
         ],
       ),
     );
@@ -91,7 +98,7 @@ class ParameterCard extends StatelessWidget {
       case 'bool':
         return _buildToggle();
       case 'choice':
-        return _buildChoiceChips();
+        return _buildChoiceSelector();
       default:
         return _buildSlider();
     }
@@ -137,11 +144,12 @@ class ParameterCard extends StatelessWidget {
       onTap: () {
         HapticFeedback.mediumImpact();
         onChanged(isOn ? 0.0 : 1.0);
+        onChangeEnd?.call(isOn ? 0.0 : 1.0);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
-        height: 40,
+        height: 38,
         decoration: BoxDecoration(
           color: isOn
               ? const Color(0xFF00c853).withValues(alpha: 0.2)
@@ -159,7 +167,7 @@ class ParameterCard extends StatelessWidget {
           isOn ? 'ON' : 'OFF',
           style: TextStyle(
             color: isOn ? const Color(0xFF00c853) : const Color(0xFF6b7280),
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.5,
           ),
@@ -168,46 +176,92 @@ class ParameterCard extends StatelessWidget {
     );
   }
 
-  Widget _buildChoiceChips() {
+  Widget _buildChoiceSelector() {
     final selectedIndex = value.round().clamp(0, options.length - 1);
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: List.generate(options.length, (i) {
-        final isActive = i == selectedIndex;
-        return GestureDetector(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onChanged(i.toDouble());
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? const Color(0xFF818cf8).withValues(alpha: 0.15)
-                  : const Color(0xFF1a1d2e),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isActive
-                    ? const Color(0xFF818cf8).withValues(alpha: 0.5)
-                    : const Color(0xFF2d3245),
-                width: 1,
-              ),
+    final currentLabel = options.isNotEmpty
+        ? options[selectedIndex]
+        : 'Select…';
+
+    return PopupMenuButton<int>(
+      onSelected: (int newIndex) {
+        HapticFeedback.selectionClick();
+        onChanged(newIndex.toDouble());
+        onChangeEnd?.call(newIndex.toDouble());
+      },
+      color: const Color(0xFF1e2235),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFF2d3245)),
+      ),
+      itemBuilder: (context) {
+        return List.generate(options.length, (i) {
+          final isSelected = i == selectedIndex;
+          return PopupMenuItem<int>(
+            value: i,
+            child: Row(
+              children: [
+                Icon(
+                  isSelected
+                      ? Icons.check_circle_rounded
+                      : Icons.circle_outlined,
+                  color: isSelected
+                      ? const Color(0xFF38bdf8)
+                      : const Color(0xFF6b7280),
+                  size: 16,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    options[i],
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.white
+                          : const Color(0xFF94a3b8),
+                      fontSize: 13,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            child: Text(
-              options[i],
-              style: TextStyle(
-                color: isActive
-                    ? const Color(0xFF818cf8)
-                    : const Color(0xFF6b7280),
-                fontSize: 11,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
+          );
+        });
+      },
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1a1d2e),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: const Color(0xFF38bdf8).withValues(alpha: 0.4),
+            width: 1,
           ),
-        );
-      }),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                currentLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF38bdf8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.arrow_drop_down_rounded,
+              color: Color(0xFF38bdf8),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
