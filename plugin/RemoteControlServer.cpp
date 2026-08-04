@@ -233,14 +233,17 @@ bool RemoteControlServer::performWebSocketHandshake (juce::StreamingSocket &clie
 
     juce::String request (buf, static_cast<size_t> (totalRead));
 
-    if (!request.containsIgnoreCase ("Upgrade: websocket"))
+    if (!request.containsIgnoreCase ("upgrade") || !request.containsIgnoreCase ("websocket"))
+    {
+        DBG ("RemoteControlServer: Handshake failed (missing Upgrade header). Request:\n" + request);
         return false;
+    }
 
     // Extract Sec-WebSocket-Key
     juce::String key;
     for (auto line : juce::StringArray::fromLines (request))
     {
-        if (line.trim ().startsWithIgnoreCase ("Sec-WebSocket-Key:"))
+        if (line.containsIgnoreCase ("Sec-WebSocket-Key"))
         {
             key = line.fromFirstOccurrenceOf (":", false, false).trim ();
             break;
@@ -248,7 +251,10 @@ bool RemoteControlServer::performWebSocketHandshake (juce::StreamingSocket &clie
     }
 
     if (key.isEmpty ())
+    {
+        DBG ("RemoteControlServer: Handshake failed (missing Sec-WebSocket-Key). Request:\n" + request);
         return false;
+    }
 
     // Compute accept hash — SHA-1 is required by RFC 6455
     juce::String magic = key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
