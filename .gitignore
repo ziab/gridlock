@@ -35,9 +35,12 @@ companion/android/key.properties
 companion/android/*.jks
 companion/ios/Pods/
 companion/ios/.symlinks/
+companion/windows/flutter/ephemeral/
+companion/windows/out/
 companion/.packages
 
 # ── General ──────────────────────────────────────────────────────
 *.log
 *.tmp
 Thumbs.db
+
