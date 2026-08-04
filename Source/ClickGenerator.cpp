@@ -231,4 +231,14 @@ void ClickGenerator::renderBlock(juce::AudioBuffer<float>& outputBuffer,
             ++it;
         }
     }
+
+    // Smooth Soft-Clipper Limiter (tanh) to prevent digital clipping when volume > 1.0 (up to +6dB boost)
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        float* channelData = outputBuffer.getWritePointer(ch);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            channelData[i] = std::tanh(channelData[i]);
+        }
+    }
 }

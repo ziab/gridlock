@@ -100,7 +100,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ "click_volume", 1 },
         "Click Volume",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
+        juce::NormalisableRange<float>(0.0f, 2.0f, 0.01f),
         0.8f
     ));
 
