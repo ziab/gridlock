@@ -63,8 +63,11 @@ class PracticeTimerService extends ChangeNotifier {
 
         if (_hasEndBpm && _totalDurationSeconds > 0) {
           final ratio = (_totalDurationSeconds - _remainingSeconds) / _totalDurationSeconds;
-          _currentBpm = (_startBpm + (_endBpm - _startBpm) * ratio).roundToDouble();
-          _onBpmChanged?.call(_currentBpm);
+          final newBpm = (_startBpm + (_endBpm - _startBpm) * ratio).roundToDouble();
+          if (newBpm != _currentBpm) {
+            _currentBpm = newBpm;
+            _onBpmChanged?.call(_currentBpm);
+          }
         }
 
         notifyListeners();
