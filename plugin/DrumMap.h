@@ -86,9 +86,9 @@ inline const std::vector<LaneInfo> &getStandardDrumLanes ()
         {"CYMBALS",
          {CymbalEdge29, CymbalBell30, Crash1, Ride, ChineseCymbal, Crash2, SplashCymbal, Crash2Edge, RideEdge}},
         {"HI-HAT", {ClosedHiHatEdge, ClosedHiHat, PedalHiHat, OpenHiHatEdge, OpenHiHat}},
-        {"KICK", {Kick}},
-        {"SNARE", {SnareHead, SnareRim}},
         {"TOMS", {HighTom, MidTom, LowTom}},
+        {"SNARE", {SnareHead, SnareRim}},
+        {"KICK", {Kick}},
         {"OTHER", {}}};
     return lanes;
 }

@@ -202,8 +202,11 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
     const double totalLatencyMs = autoLatencyMs + static_cast<double> (userLatencyMs);
     const double totalLatencyPpq = (totalLatencyMs / 1000.0) * (currentBpm / 60.0);
 
-    // Process incoming physical MIDI events
-    processIncomingMidi (midiMessages, srToUse, gridInterval, toleranceMs, minVelocity, totalLatencyPpq);
+    // Process incoming physical MIDI events when NOT paused
+    if (!isPausedVal)
+    {
+        processIncomingMidi (midiMessages, srToUse, gridInterval, toleranceMs, minVelocity, totalLatencyPpq);
+    }
 
     // Synthesize Humanized Rock Drum Beat in TEST / DEMO Mode
     if (testModeVal && !isPausedVal && currentTimeSigNum > 0)
