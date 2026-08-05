@@ -855,63 +855,129 @@ class _ControlScreenState extends State<ControlScreen>
   ) {
     final val = (tolerance?.value ?? 20.0).toDouble();
     final minVal = (tolerance?.min ?? 5.0).toDouble();
-    final maxVal = (tolerance?.max ?? 30.0).toDouble();
+    final maxVal = (tolerance?.max ?? 40.0).toDouble();
     final divisions = ((maxVal - minVal) * 2).round();
+
+    final tier = _getToleranceTier(val);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'TIMING TOLERANCE',
-              style: TextStyle(
-                color: Color(0xFF8b92a8),
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2.5,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '±${val.toStringAsFixed(1)} ms',
-              style: const TextStyle(
-                color: Color(0xFF00FF88),
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
+        // Fixed-width header line so TIMING TOLERANCE label stays completely stationary
         SizedBox(
           width: 340,
-          child: SliderTheme(
-            data: SliderThemeData(
-              activeTrackColor: const Color(0xFF00FF88),
-              inactiveTrackColor: const Color(0xFF1e2e35),
-              thumbColor: const Color(0xFF00FF88),
-              overlayColor: const Color(0xFF00FF88).withValues(alpha: 0.2),
-              trackHeight: 4,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-            ),
-            child: Slider(
-              value: val.clamp(minVal, maxVal),
-              min: minVal,
-              max: maxVal,
-              divisions: divisions > 0 ? divisions : 50,
-              onChanged: (v) {
-                HapticFeedback.selectionClick();
-                connection.updateLocalParameterValue(
-                  'tolerance_ms',
-                  (v * 2).round() / 2,
-                );
-              },
-              onChangeEnd: (v) {
-                connection.setParameter('tolerance_ms', (v * 2).round() / 2);
-              },
-            ),
+          child: Row(
+            children: [
+              const Text(
+                'TIMING TOLERANCE',
+                style: TextStyle(
+                  color: Color(0xFF8b92a8),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2.5,
+                ),
+              ),
+              const Spacer(),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 150),
+                style: TextStyle(
+                  color: tier.color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+                child: Text('±${val.toStringAsFixed(1)} ms'),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 78,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: tier.color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: tier.color.withValues(alpha: 0.5),
+                      width: 1,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      tier.title,
+                      style: TextStyle(
+                        color: tier.color,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Spectrum Gradient Slider
+        SizedBox(
+          width: 340,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Spectrum Gradient Track Background accurately mapped to 5-40 ms linear scale
+              Container(
+                height: 6,
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF00FF88), // < 5ms (Emerald)
+                      Color(0xFFA3E635), // 5-10ms (Lime)
+                      Color(0xFFFACC15), // 10-20ms (Amber)
+                      Color(0xFFFB923C), // 20-40ms (Orange)
+                    ],
+                    stops: [0.0, 0.14, 0.43, 1.0], // 5ms=0.0, 10ms=0.14, 20ms=0.43, 40ms=1.0
+                  ),
+                ),
+              ),
+
+              SliderTheme(
+                data: SliderThemeData(
+                  activeTrackColor: tier.color,
+                  inactiveTrackColor: Colors.black.withValues(alpha: 0.4),
+                  thumbColor: tier.color,
+                  overlayColor: tier.color.withValues(alpha: 0.2),
+                  trackHeight: 4,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 10,
+                    elevation: 4,
+                  ),
+                ),
+                child: Slider(
+                  value: val.clamp(minVal, maxVal),
+                  min: minVal,
+                  max: maxVal,
+                  divisions: divisions > 0 ? divisions : 70,
+                  onChanged: (v) {
+                    HapticFeedback.selectionClick();
+                    connection.updateLocalParameterValue(
+                      'tolerance_ms',
+                      (v * 2).round() / 2,
+                    );
+                  },
+                  onChangeEnd: (v) {
+                    connection.setParameter(
+                      'tolerance_ms',
+                      (v * 2).round() / 2,
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1252,4 +1318,48 @@ class _SecondaryDef {
   final String displayName;
   final String? suffix;
   const _SecondaryDef(this.id, this.displayName, {this.suffix});
+}
+
+class _ToleranceTier {
+  final String title;
+  final Color color;
+
+  const _ToleranceTier({
+    required this.title,
+    required this.color,
+  });
+}
+
+_ToleranceTier _getToleranceTier(double ms) {
+  if (ms < 5.0) {
+    return const _ToleranceTier(
+      title: 'Perfect',
+      color: Color(0xFF00FF88),
+    );
+  } else if (ms < 10.0) {
+    return const _ToleranceTier(
+      title: 'Tight',
+      color: Color(0xFFA3E635),
+    );
+  } else if (ms < 20.0) {
+    return const _ToleranceTier(
+      title: 'Groove',
+      color: Color(0xFFFACC15),
+    );
+  } else if (ms < 40.0) {
+    return const _ToleranceTier(
+      title: 'Early / Late',
+      color: Color(0xFFFB923C),
+    );
+  } else if (ms < 70.0) {
+    return const _ToleranceTier(
+      title: 'Off-Beat',
+      color: Color(0xFFF87171),
+    );
+  } else {
+    return const _ToleranceTier(
+      title: 'Wrong',
+      color: Color(0xFFC084FC),
+    );
+  }
 }
