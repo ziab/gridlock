@@ -527,6 +527,8 @@ class _ControlScreenState extends State<ControlScreen>
                             'internal_bpm',
                             v,
                           );
+                        },
+                        onChangeEnd: (v) {
                           connection.setParameter('internal_bpm', v);
                         },
                       ),

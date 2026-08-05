@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class BpmRulerSelector extends StatefulWidget {
   final double bpm;
   final ValueChanged<double> onChanged;
+  final ValueChanged<double>? onChangeEnd;
   final double minBpm;
   final double maxBpm;
 
@@ -10,6 +11,7 @@ class BpmRulerSelector extends StatefulWidget {
     super.key,
     required this.bpm,
     required this.onChanged,
+    this.onChangeEnd,
     this.minBpm = 30.0,
     this.maxBpm = 300.0,
   });
@@ -53,11 +55,17 @@ class _BpmRulerSelectorState extends State<BpmRulerSelector> {
     });
   }
 
+  void _handleDragEnd(DragEndDetails details) {
+    final newBpm = (_currentOffset / _pixelsPerBpm).roundToDouble();
+    widget.onChangeEnd?.call(newBpm);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return GestureDetector(
       onHorizontalDragUpdate: _handleDragUpdate,
+      onHorizontalDragEnd: _handleDragEnd,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
         height: 110,
