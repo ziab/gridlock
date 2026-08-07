@@ -123,9 +123,9 @@ void ClickGenerator::synthesizeAllPresets (double sampleRate)
     };
 
     // Preset 2: Digital Beep
-    makeToneBuffer (presetSamples[2].highClick, 2500.0f, 25.0f, 5.00f, 0.50f, 6.0f);
-    makeToneBuffer (presetSamples[2].midClick, 2000.0f, 17.0f, 3.50f, 0.30f, 6.0f);
-    makeToneBuffer (presetSamples[2].subClick, 1000.0f, 8.0f, 1.00f, 0.00f, 8.0f);
+    makeToneBuffer (presetSamples[2].highClick, 2500.0f, 30.0f, 5.00f, 0.50f, 6.0f);
+    makeToneBuffer (presetSamples[2].midClick, 2000.0f, 20.0f, 3.50f, 0.30f, 6.0f);
+    makeToneBuffer (presetSamples[2].subClick, 1000.0f, 10.0f, 1.00f, 0.00f, 8.0f);
 
     // Preset 3: Cowbell
     makeDualToneBuffer (presetSamples[3].highClick, 800.0f, 540.0f, 25.0f, 1.00f);
