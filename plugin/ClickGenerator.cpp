@@ -150,63 +150,38 @@ double ClickGenerator::getClickSubdivisionPpq (int index) const noexcept
     }
 }
 
-void ClickGenerator::renderBlock (juce::AudioBuffer<float> &outputBuffer, int numSamples, double sampleRate,
-                                  double blockStartPpq, double bpm, int timeSigNum, int clickSubdivisionIndex,
-                                  int clickPresetIndex, float clickVolume, float clickPan, bool clickEnabled)
+void ClickGenerator::scheduleClicks (double blockStartPpq, double blockEndPpq, double ppqPerSample, int numSamples,
+                                     double clickInterval, int timeSigNum, const ClickSet &set)
 {
-    if (numSamples <= 0 || sampleRate <= 0.0)
-        return;
+    const double firstTick = std::floor (blockStartPpq / clickInterval) * clickInterval;
 
-    const int presetIdx = std::clamp (clickPresetIndex, 0, static_cast<int> (presetSamples.size ()) - 1);
-    const auto &currentClickSet = presetSamples[static_cast<size_t> (presetIdx)];
-
-    const int numChannels = outputBuffer.getNumChannels ();
-    const double ppqPerSample = (bpm / 60.0) / sampleRate;
-    const double blockEndPpq = blockStartPpq + numSamples * ppqPerSample;
-    const double clickInterval = getClickSubdivisionPpq (clickSubdivisionIndex);
-
-    // Trigger new clicks if enabled
-    if (clickEnabled && clickInterval > 0.0 && timeSigNum > 0)
+    for (double tick = firstTick; tick < blockEndPpq; tick += clickInterval)
     {
-        const double firstTick = std::floor (blockStartPpq / clickInterval) * clickInterval;
+        if (tick < blockStartPpq)
+            continue;
 
-        for (double tick = firstTick; tick < blockEndPpq; tick += clickInterval)
-        {
-            if (tick >= blockStartPpq)
-            {
-                const int sampleOffset = std::clamp (
-                    static_cast<int> (std::round ((tick - blockStartPpq) / ppqPerSample)), 0, numSamples - 1);
+        const int sampleOffset = std::clamp (
+            static_cast<int> (std::round ((tick - blockStartPpq) / ppqPerSample)), 0, numSamples - 1);
 
-                const double barPpq = std::fmod (tick, static_cast<double> (timeSigNum));
-                const bool isDownbeat = (std::abs (barPpq) < 0.001 || std::abs (barPpq - timeSigNum) < 0.001);
-                const double quarterPpq = std::fmod (tick, 1.0);
-                const bool isQuarterBeat = (std::abs (quarterPpq) < 0.001 || std::abs (quarterPpq - 1.0) < 0.001);
+        const double barPpq = std::fmod (tick, static_cast<double> (timeSigNum));
+        const bool isDownbeat = (std::abs (barPpq) < 0.001 || std::abs (barPpq - timeSigNum) < 0.001);
+        const double quarterPpq = std::fmod (tick, 1.0);
+        const bool isQuarterBeat = (std::abs (quarterPpq) < 0.001 || std::abs (quarterPpq - 1.0) < 0.001);
 
-                const juce::AudioBuffer<float> *targetSample = &currentClickSet.subClick;
-                if (isDownbeat)
-                {
-                    targetSample = &currentClickSet.highClick;
-                }
-                else if (isQuarterBeat)
-                {
-                    targetSample = &currentClickSet.midClick;
-                }
+        const juce::AudioBuffer<float> *targetSample = &set.subClick;
+        if (isDownbeat) targetSample = &set.highClick;
+        else if (isQuarterBeat) targetSample = &set.midClick;
 
-                if (targetSample->getNumSamples () > 0)
-                {
-                    activeVoiceList.push_back ({targetSample, -sampleOffset});
-                }
-            }
-        }
+        if (targetSample->getNumSamples () > 0)
+            activeVoiceList.push_back ({targetSample, -sampleOffset}); // negative offset = future start
     }
+}
 
-    // Equal-Power Stereo Panning Law
-    const float panNorm = std::clamp (clickPan, -1.0f, 1.0f);
-    const float angle = (panNorm + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
-    const float leftGain = clickVolume * std::cos (angle);
-    const float rightGain = clickVolume * std::sin (angle);
+void ClickGenerator::mixActiveVoices (juce::AudioBuffer<float> &outputBuffer, int numSamples, float leftGain,
+                                      float rightGain)
+{
+    const int numChannels = outputBuffer.getNumChannels ();
 
-    // Render active click voices into output audio buffer with stereo panning
     for (auto it = activeVoiceList.begin (); it != activeVoiceList.end ();)
     {
         const auto *srcBuffer = it->buffer;
@@ -220,35 +195,54 @@ void ClickGenerator::renderBlock (juce::AudioBuffer<float> &outputBuffer, int nu
         {
             if (voicePos >= 0)
             {
-                const float sampleVal = srcData[voicePos];
-                if (numChannels >= 1)
-                    outputBuffer.addSample (0, sampleIdx, sampleVal * leftGain);
-                if (numChannels >= 2)
-                    outputBuffer.addSample (1, sampleIdx, sampleVal * rightGain);
+                const float v = srcData[voicePos];
+                if (numChannels >= 1) outputBuffer.addSample (0, sampleIdx, v * leftGain);
+                if (numChannels >= 2) outputBuffer.addSample (1, sampleIdx, v * rightGain);
             }
-            sampleIdx++;
-            voicePos++;
+            ++sampleIdx;
+            ++voicePos;
         }
 
         it->currentSamplePosition = voicePos;
-
         if (it->currentSamplePosition >= srcLength)
-        {
             it = activeVoiceList.erase (it);
-        }
         else
-        {
             ++it;
-        }
     }
+}
 
-    // Smooth Soft-Clipper Limiter (tanh) to prevent digital clipping when volume > 1.0 (up to +6dB boost)
-    for (int ch = 0; ch < numChannels; ++ch)
+void ClickGenerator::applySoftClipper (juce::AudioBuffer<float> &buffer, int numSamples) noexcept
+{
+    for (int ch = 0; ch < buffer.getNumChannels (); ++ch)
     {
-        float *channelData = outputBuffer.getWritePointer (ch);
+        float *data = buffer.getWritePointer (ch);
         for (int i = 0; i < numSamples; ++i)
-        {
-            channelData[i] = std::tanh (channelData[i]);
-        }
+            data[i] = std::tanh (data[i]);
     }
+}
+
+void ClickGenerator::renderBlock (juce::AudioBuffer<float> &outputBuffer, int numSamples, double sampleRate,
+                                   double blockStartPpq, double bpm, int timeSigNum, int clickSubdivisionIndex,
+                                   int clickPresetIndex, float clickVolume, float clickPan, bool clickEnabled)
+{
+    if (numSamples <= 0 || sampleRate <= 0.0)
+        return;
+
+    const int presetIdx = std::clamp (clickPresetIndex, 0, static_cast<int> (presetSamples.size ()) - 1);
+    const auto &currentClickSet = presetSamples[static_cast<size_t> (presetIdx)];
+
+    const double ppqPerSample = (bpm / 60.0) / sampleRate;
+    const double blockEndPpq = blockStartPpq + numSamples * ppqPerSample;
+    const double clickInterval = getClickSubdivisionPpq (clickSubdivisionIndex);
+
+    if (clickEnabled && clickInterval > 0.0 && timeSigNum > 0)
+        scheduleClicks (blockStartPpq, blockEndPpq, ppqPerSample, numSamples, clickInterval, timeSigNum, currentClickSet);
+
+    const float panNorm = std::clamp (clickPan, -1.0f, 1.0f);
+    const float angle = (panNorm + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+    const float leftGain = clickVolume * std::cos (angle);
+    const float rightGain = clickVolume * std::sin (angle);
+
+    mixActiveVoices (outputBuffer, numSamples, leftGain, rightGain);
+    applySoftClipper (outputBuffer, numSamples);
 }

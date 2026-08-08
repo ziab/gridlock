@@ -36,6 +36,11 @@ class ClickGenerator
     void loadWavPreset (const char *wavData, int dataSize, double sampleRate, ClickSet &set);
     double getClickSubdivisionPpq (int index) const noexcept;
 
+    void scheduleClicks (double blockStartPpq, double blockEndPpq, double ppqPerSample, int numSamples,
+                         double clickInterval, int timeSigNum, const ClickSet &set);
+    void mixActiveVoices (juce::AudioBuffer<float> &outputBuffer, int numSamples, float leftGain, float rightGain);
+    static void applySoftClipper (juce::AudioBuffer<float> &buffer, int numSamples) noexcept;
+
     std::array<ClickSet, 4> presetSamples;
     std::vector<ActiveSample> activeVoiceList;
     juce::Random random;

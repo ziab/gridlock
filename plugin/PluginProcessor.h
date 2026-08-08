@@ -10,6 +10,23 @@
 class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor
 {
   public:
+    struct ParamSnapshot
+    {
+        int subChoice{2};
+        float toleranceMs{20.0f};
+        float userLatencyMs{0.0f};
+        int minVelocity{5};
+        float internalBpm{120.0f};
+        int timeSigNum{4};
+        int clickSubChoice{1};
+        int clickPreset{0};
+        float clickVolume{0.8f};
+        float clickPan{0.0f};
+        bool clickEnabled{true};
+        bool isPaused{false};
+        bool testMode{false};
+    };
+
     MidiGridAnalyzerAudioProcessor ();
     ~MidiGridAnalyzerAudioProcessor () override;
 
@@ -93,14 +110,23 @@ class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor
     }
 
     static double getSubdivisionPpq (int index) noexcept;
+    static ParamSnapshot readSnapshot (const juce::AudioProcessorValueTreeState &apvts) noexcept;
 
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout ();
+
+  private:
     void updateHostSyncAndPlayhead (float internalBpmVal, int timeSigNumVal, bool isPausedVal);
     void processIncomingMidi (const juce::MidiBuffer &midiMessages, double srToUse, double gridInterval,
                               float toleranceMs, int minVelocity, double totalLatencyPpq);
-    bool shouldFilterHiHatTrigger (uint8_t noteNum, uint8_t velocity, double nowMs);
+    // Hi-hat ghost suppression: records edge/closed hits and filters spurious open-tip retriggers.
+    // Returns true if the note should be filtered (dropped).
+    bool updateHiHatHistoryAndShouldFilter (uint8_t noteNum, uint8_t velocity, double nowMs);
+
     void generateTestModeBeat (double blockStartPpq, double blockEndPpq, double totalLatencyPpq, double gridInterval,
                                float toleranceMs);
+    double generateHumanizedDeviationMs (float toleranceMs);
+    HitEvent makeQuantizedHit (uint8_t note, uint8_t vel, double targetCompPpq, double gridInterval,
+                               double bpm, float toleranceMs, double totalLatencyPpq) const;
 
     juce::AudioProcessorValueTreeState apvts;
     RingBuffer<4096> ringBuffer;
@@ -113,7 +139,6 @@ class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor
     bool hostIsPlaying{false};
     bool isStandaloneMode{false};
 
-    // Remote companion app server (standalone mode only)
     std::unique_ptr<RemoteControlServer> remoteServer;
 
     double lastTestBeatTick{-1.0};

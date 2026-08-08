@@ -20,11 +20,26 @@ class MidiGridAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor, 
   private:
     void timerCallback () override;
 
+    void setupControls ();
+    void attachParameters ();
+    void setupTimeSigHandling ();
+
+    void drainRingBuffer ();
+    void evictOldEvents (double currentPpq, int barsVal);
+    GridViewState buildGridViewState (int barsVal) const;
+
+    static int indexForTimeSig (int num) noexcept;
+    static int timeSigForIndex (int idx) noexcept;
+    static int barsForIndex (int idx) noexcept;
+
+    void styleCombo (juce::ComboBox &cb, juce::StringArray items, juce::Label &label, const char *labelText);
+    void styleSlider (juce::Slider &s, juce::Label &label, const char *labelText, int textBoxW, juce::uint32 labelCol = 0xffb0b8c8);
+    void styleToggle (juce::TextButton &b, juce::uint32 onColour, juce::uint32 offText = 0xffffffff, juce::uint32 onText = 0xffffffff);
+
     MidiGridAnalyzerAudioProcessor &processorRef;
 
     GridComponent gridComponent;
 
-    // Controls
     juce::ComboBox barsComboBox;
     juce::ComboBox subdivisionComboBox;
     juce::Slider toleranceSlider;
@@ -44,7 +59,6 @@ class MidiGridAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor, 
     juce::TextButton testButton{"TEST MODE"};
     juce::TextButton clearButton{"Clear Grid"};
 
-    // Labels
     juce::Label barsLabel{{}, "Bars:"};
     juce::Label subdivisionLabel{{}, "Subdiv:"};
     juce::Label toleranceLabel{{}, "Tolerance:"};

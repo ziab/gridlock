@@ -1,4 +1,5 @@
 #include "RemoteControlServer.h"
+#include "Crypto.h"
 
 #include <algorithm>
 #include <cstring>
@@ -256,111 +257,10 @@ bool RemoteControlServer::performWebSocketHandshake (juce::StreamingSocket &clie
         return false;
     }
 
-    // Compute accept hash — SHA-1 is required by RFC 6455
+    // Compute accept hash — SHA-1 per RFC 6455 (extracted to Crypto.h)
     juce::String magic = key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-
-    // SHA-1 is required by RFC 6455 — use raw SHA-1 + Base64
-    juce::MemoryBlock sha1Block;
-    {
-        // Manual SHA-1 via JUCE's built-in (juce_core has SHA256 but not SHA1 directly)
-        // We'll use a compact SHA-1 implementation inline
-        auto sha1Digest = [] (const void *data, size_t len) -> std::array<uint8_t, 20>
-        {
-            // SHA-1 implementation (RFC 3174)
-            auto leftRotate = [] (uint32_t value, int bits) -> uint32_t
-            { return (value << bits) | (value >> (32 - bits)); };
-
-            uint32_t h0 = 0x67452301;
-            uint32_t h1 = 0xEFCDAB89;
-            uint32_t h2 = 0x98BADCFE;
-            uint32_t h3 = 0x10325476;
-            uint32_t h4 = 0xC3D2E1F0;
-
-            // Pre-processing
-            uint64_t bitLen = static_cast<uint64_t> (len) * 8;
-            std::vector<uint8_t> msg (static_cast<const uint8_t *> (data), static_cast<const uint8_t *> (data) + len);
-            msg.push_back (0x80);
-            while (msg.size () % 64 != 56)
-                msg.push_back (0x00);
-
-            for (int i = 7; i >= 0; --i)
-                msg.push_back (static_cast<uint8_t> ((bitLen >> (i * 8)) & 0xFF));
-
-            // Process each 512-bit block
-            for (size_t offset = 0; offset < msg.size (); offset += 64)
-            {
-                uint32_t w[80];
-                for (int i = 0; i < 16; ++i)
-                {
-                    w[i] = (static_cast<uint32_t> (msg[offset + i * 4]) << 24) |
-                           (static_cast<uint32_t> (msg[offset + i * 4 + 1]) << 16) |
-                           (static_cast<uint32_t> (msg[offset + i * 4 + 2]) << 8) |
-                           (static_cast<uint32_t> (msg[offset + i * 4 + 3]));
-                }
-                for (int i = 16; i < 80; ++i)
-                    w[i] = leftRotate (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
-
-                uint32_t a = h0, b = h1, c = h2, d = h3, e = h4;
-
-                for (int i = 0; i < 80; ++i)
-                {
-                    uint32_t f, k;
-                    if (i < 20)
-                    {
-                        f = (b & c) | ((~b) & d);
-                        k = 0x5A827999;
-                    }
-                    else if (i < 40)
-                    {
-                        f = b ^ c ^ d;
-                        k = 0x6ED9EBA1;
-                    }
-                    else if (i < 60)
-                    {
-                        f = (b & c) | (b & d) | (c & d);
-                        k = 0x8F1BBCDC;
-                    }
-                    else
-                    {
-                        f = b ^ c ^ d;
-                        k = 0xCA62C1D6;
-                    }
-
-                    uint32_t temp = leftRotate (a, 5) + f + e + k + w[i];
-                    e = d;
-                    d = c;
-                    c = leftRotate (b, 30);
-                    b = a;
-                    a = temp;
-                }
-
-                h0 += a;
-                h1 += b;
-                h2 += c;
-                h3 += d;
-                h4 += e;
-            }
-
-            std::array<uint8_t, 20> digest;
-            auto store = [&digest] (int offset, uint32_t val)
-            {
-                digest[offset] = static_cast<uint8_t> ((val >> 24) & 0xFF);
-                digest[offset + 1] = static_cast<uint8_t> ((val >> 16) & 0xFF);
-                digest[offset + 2] = static_cast<uint8_t> ((val >> 8) & 0xFF);
-                digest[offset + 3] = static_cast<uint8_t> (val & 0xFF);
-            };
-            store (0, h0);
-            store (4, h1);
-            store (8, h2);
-            store (12, h3);
-            store (16, h4);
-            return digest;
-        };
-
-        auto digest = sha1Digest (magic.toRawUTF8 (), magic.getNumBytesAsUTF8 ());
-        sha1Block.append (digest.data (), digest.size ());
-    }
-
+    auto digest = Crypto::sha1 (magic.toRawUTF8 (), magic.getNumBytesAsUTF8 ());
+    juce::MemoryBlock sha1Block (digest.data (), digest.size ());
     juce::String acceptKey = juce::Base64::toBase64 (sha1Block.getData (), sha1Block.getSize ());
 
     juce::String response = "HTTP/1.1 101 Switching Protocols\r\n"
