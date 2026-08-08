@@ -45,6 +45,6 @@ inline constexpr juce::uint32 buttonNoteOn = 0xff06b6d4;
 inline constexpr juce::uint32 buttonTestOn = 0xffec4899;
 
 inline juce::Colour col (juce::uint32 argb) {
-    return juce::Colour (argb);
+  return juce::Colour (argb);
 }
 } // namespace Theme

@@ -42,8 +42,8 @@ constexpr uint8_t Crash = 125;
 } // namespace TestModeVelocity
 
 struct LaneInfo {
-    juce::String label;
-    std::vector<uint8_t> notes;
+  juce::String label;
+  std::vector<uint8_t> notes;
 };
 
 // Velocity-dependent debounce for Note 46 (Open Hi-Hat Tip) ghost-note suppression.
@@ -64,26 +64,26 @@ static constexpr double kHiHatDebounceMinMs = 60.0;
 static constexpr double kHiHatDebounceMaxMs = 200.0;
 
 inline double hiHatDebounceWindowMs (uint8_t velocity) noexcept {
-    const double v = static_cast<double> (velocity) / 127.0; // normalise 0..1
-    const double t = v * v;                                  // quadratic - non-linear boost for loud hits
-    return kHiHatDebounceMaxMs - (kHiHatDebounceMaxMs - kHiHatDebounceMinMs) * t;
+  const double v = static_cast<double> (velocity) / 127.0; // normalise 0..1
+  const double t = v * v;                                  // quadratic - non-linear boost for loud hits
+  return kHiHatDebounceMaxMs - (kHiHatDebounceMaxMs - kHiHatDebounceMinMs) * t;
 }
 
 // Notes to exclude entirely from the grid display (currently no notes excluded)
 inline bool isExcluded (uint8_t note) noexcept {
-    juce::ignoreUnused (note);
-    return false;
+  juce::ignoreUnused (note);
+  return false;
 }
 
 inline const std::vector<LaneInfo> &getStandardDrumLanes () {
-    static const std::vector<LaneInfo> lanes = {
-        {"CYMBALS",
-         {CymbalEdge29, CymbalBell30, Crash1, Ride, ChineseCymbal, Crash2, SplashCymbal, Crash2Edge, RideEdge}},
-        {"HI-HAT", {ClosedHiHatEdge, ClosedHiHat, PedalHiHat, OpenHiHatEdge, OpenHiHat}},
-        {"TOMS", {HighTom, MidTom, LowTom}},
-        {"SNARE", {SnareHead, SnareRim}},
-        {"KICK", {Kick}},
-        {"OTHER", {}}};
-    return lanes;
+  static const std::vector<LaneInfo> lanes = {
+      {"CYMBALS",
+       {CymbalEdge29, CymbalBell30, Crash1, Ride, ChineseCymbal, Crash2, SplashCymbal, Crash2Edge, RideEdge}},
+      {"HI-HAT", {ClosedHiHatEdge, ClosedHiHat, PedalHiHat, OpenHiHatEdge, OpenHiHat}},
+      {"TOMS", {HighTom, MidTom, LowTom}},
+      {"SNARE", {SnareHead, SnareRim}},
+      {"KICK", {Kick}},
+      {"OTHER", {}}};
+  return lanes;
 }
 } // namespace DrumMap

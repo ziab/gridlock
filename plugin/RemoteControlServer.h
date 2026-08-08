@@ -21,50 +21,50 @@
  *             Heartbeat    → pushes {"type":"ping"} every 2 s.
  */
 class RemoteControlServer : private juce::Thread, private juce::Timer {
-  public:
-    explicit RemoteControlServer (juce::AudioProcessorValueTreeState &apvts, int wsPort = 9876, int udpPort = 9877);
-    ~RemoteControlServer () override;
+public:
+  explicit RemoteControlServer (juce::AudioProcessorValueTreeState &apvts, int wsPort = 9876, int udpPort = 9877);
+  ~RemoteControlServer () override;
 
-    void start ();
-    void stop ();
+  void start ();
+  void stop ();
 
-  private:
-    // ── Thread (WebSocket accept loop) ──────────────────────────────
-    void run () override;
+private:
+  // ── Thread (WebSocket accept loop) ──────────────────────────────
+  void run () override;
 
-    // ── Timer (parameter change polling + heartbeat) ────────────────
-    void timerCallback () override;
+  // ── Timer (parameter change polling + heartbeat) ────────────────
+  void timerCallback () override;
 
-    // ── UDP Discovery ───────────────────────────────────────────────
-    void runDiscoveryListener ();
+  // ── UDP Discovery ───────────────────────────────────────────────
+  void runDiscoveryListener ();
 
-    // ── WebSocket helpers ───────────────────────────────────────────
-    bool performWebSocketHandshake (juce::StreamingSocket &client);
-    juce::String readWebSocketTextFrame (juce::StreamingSocket &client);
-    bool sendWebSocketTextFrame (juce::StreamingSocket &client, const juce::String &text);
-    void handleClientMessage (juce::StreamingSocket &client, const juce::String &message);
-    juce::String buildFullStateJson () const;
-    void broadcastToClients (const juce::String &json);
+  // ── WebSocket helpers ───────────────────────────────────────────
+  bool performWebSocketHandshake (juce::StreamingSocket &client);
+  juce::String readWebSocketTextFrame (juce::StreamingSocket &client);
+  bool sendWebSocketTextFrame (juce::StreamingSocket &client, const juce::String &text);
+  void handleClientMessage (juce::StreamingSocket &client, const juce::String &message);
+  juce::String buildFullStateJson () const;
+  void broadcastToClients (const juce::String &json);
 
-    // ── Members ─────────────────────────────────────────────────────
-    juce::AudioProcessorValueTreeState &apvts;
+  // ── Members ─────────────────────────────────────────────────────
+  juce::AudioProcessorValueTreeState &apvts;
 
-    int wsPort;
-    int udpPort;
+  int wsPort;
+  int udpPort;
 
-    juce::StreamingSocket serverSocket;
+  juce::StreamingSocket serverSocket;
 
-    struct ConnectedClient {
-        std::unique_ptr<juce::StreamingSocket> socket;
-    };
-    std::vector<ConnectedClient> clients;
-    std::mutex clientsMutex;
+  struct ConnectedClient {
+    std::unique_ptr<juce::StreamingSocket> socket;
+  };
+  std::vector<ConnectedClient> clients;
+  std::mutex clientsMutex;
 
-    // Snapshot of last-sent parameter values for change detection
-    std::map<juce::String, float> lastParamValues;
+  // Snapshot of last-sent parameter values for change detection
+  std::map<juce::String, float> lastParamValues;
 
-    // UDP discovery runs on its own thread
-    std::unique_ptr<juce::Thread> discoveryThread;
+  // UDP discovery runs on its own thread
+  std::unique_ptr<juce::Thread> discoveryThread;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RemoteControlServer)
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RemoteControlServer)
 };
