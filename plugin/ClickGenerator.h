@@ -18,6 +18,8 @@ class ClickGenerator
                       double bpm, int timeSigNum, int clickSubdivisionIndex, int clickPresetIndex, float clickVolume,
                       float clickPan, bool clickEnabled);
 
+    double getClickSubdivisionPpq (int index) const noexcept;
+
   private:
     struct ActiveSample
     {
@@ -34,8 +36,6 @@ class ClickGenerator
 
     void synthesizeAllPresets (double sampleRate);
     void loadWavPreset (const char *wavData, int dataSize, double sampleRate, ClickSet &set);
-    double getClickSubdivisionPpq (int index) const noexcept;
-
     void scheduleClicks (double blockStartPpq, double blockEndPpq, double ppqPerSample, int numSamples,
                          double clickInterval, int timeSigNum, const ClickSet &set);
     void mixActiveVoices (juce::AudioBuffer<float> &outputBuffer, int numSamples, float leftGain, float rightGain);

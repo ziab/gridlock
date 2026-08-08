@@ -20,6 +20,12 @@ template <size_t Capacity = 4096> class RingBuffer
             fifo.finishedWrite (1);
             return true;
         }
+        if (size2 > 0)
+        {
+            buffer[static_cast<size_t> (start2)] = event;
+            fifo.finishedWrite (1);
+            return true;
+        }
         return false; // Buffer full
     }
 
@@ -31,6 +37,12 @@ template <size_t Capacity = 4096> class RingBuffer
         if (size1 > 0)
         {
             event = buffer[static_cast<size_t> (start1)];
+            fifo.finishedRead (1);
+            return true;
+        }
+        if (size2 > 0)
+        {
+            event = buffer[static_cast<size_t> (start2)];
             fifo.finishedRead (1);
             return true;
         }

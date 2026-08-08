@@ -96,3 +96,49 @@ target_compile_definitions(RemoteControlServerTests PRIVATE
     JUCE_USE_CURL=0
     JUCE_MODAL_LOOPS_PERMITTED=1
 )
+
+# ── P1 Logic Unit Tests ─────────
+juce_add_console_app(LogicTests
+    PRODUCT_NAME "Logic Tests"
+)
+
+target_sources(LogicTests PRIVATE
+    plugin/Crypto.h
+    plugin/DrumMap.h
+    plugin/GridComponent.h
+    plugin/GridComponent.cpp
+    plugin/HitEvent.h
+    plugin/RingBuffer.h
+    plugin/Timing.h
+    plugin/Theme.h
+    plugin/ClickGenerator.h
+    plugin/ClickGenerator.cpp
+    plugin/PluginProcessor.h
+    plugin/PluginProcessor.cpp
+    plugin/PluginEditor.h
+    plugin/PluginEditor.cpp
+    plugin/RemoteControlServer.h
+    plugin/RemoteControlServer.cpp
+    plugin/LogicTests.cpp
+)
+
+target_link_libraries(LogicTests PRIVATE
+    MidiGridAnalyzerAssets
+    juce::juce_audio_processors
+    juce::juce_audio_basics
+    juce::juce_gui_basics
+    juce::juce_graphics
+    juce::juce_core
+    juce::juce_audio_formats
+    juce::juce_opengl
+)
+
+target_compile_definitions(LogicTests PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_MODAL_LOOPS_PERMITTED=1
+    JucePlugin_Name="LogicTests"
+    JucePlugin_Desc="LogicTests"
+    JucePlugin_Manufacturer="Gridlock"
+    JucePlugin_VersionString="1.0.0"
+)
