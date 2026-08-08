@@ -1,13 +1,14 @@
 #include "ClickGenerator.h"
 
 #include "BinaryData.h"
+#include "Constants.h"
 
 #include <algorithm>
 #include <cmath>
 #include <juce_audio_formats/juce_audio_formats.h>
 
 ClickGenerator::ClickGenerator () {
-  synthesizeAllPresets (44100.0);
+  synthesizeAllPresets (constants::params::sampleRateFallback);
 }
 
 void ClickGenerator::prepareToPlay (double sampleRate) {
@@ -36,7 +37,7 @@ void ClickGenerator::loadWavPreset (const char *wavData, int dataSize, double sa
     juce::AudioBuffer<float> monoBuffer (1, static_cast<int> (reader->lengthInSamples));
     reader->read (&monoBuffer, 0, static_cast<int> (reader->lengthInSamples), 0, true, true);
 
-    const double targetSr = (sampleRate > 0.0) ? sampleRate : 44100.0;
+    const double targetSr = (sampleRate > 0.0) ? sampleRate : constants::params::sampleRateFallback;
     if (reader->sampleRate > 0.0 && std::abs (reader->sampleRate - targetSr) > 1.0) {
       const double ratio = reader->sampleRate / targetSr;
       const int newLen = std::max (1, static_cast<int> (std::ceil (reader->lengthInSamples / ratio)));
@@ -62,7 +63,7 @@ void ClickGenerator::loadWavPreset (const char *wavData, int dataSize, double sa
 }
 
 void ClickGenerator::synthesizeAllPresets (double sampleRate) {
-  const double sr = (sampleRate > 0.0) ? sampleRate : 44100.0;
+  const double sr = (sampleRate > 0.0) ? sampleRate : constants::params::sampleRateFallback;
 
   // Load embedded WAV presets
   loadWavPreset (BinaryData::wood_clave_wav, BinaryData::wood_clave_wavSize, sr, presetSamples[0]);
@@ -121,17 +122,18 @@ void ClickGenerator::synthesizeAllPresets (double sampleRate) {
 }
 
 double ClickGenerator::getClickSubdivisionPpq (int index) const noexcept {
+  using namespace constants::musical;
   switch (index) {
   case 1:
-    return 1.0; // 1/4 Notes
+    return ppq_click_1_4;
   case 2:
-    return 0.5; // 1/8 Notes
+    return ppq_click_1_8;
   case 3:
-    return 0.25; // 1/16 Notes
+    return ppq_click_1_16;
   case 4:
-    return 1.0 / 3.0; // Triplets
+    return ppq_click_triplet;
   default:
-    return 0.0; // Off
+    return 0.0;
   }
 }
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Constants.h"
+
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_core/juce_core.h>
 #include <memory>
@@ -22,7 +24,8 @@
  */
 class RemoteControlServer : private juce::Thread, private juce::Timer {
 public:
-  explicit RemoteControlServer (juce::AudioProcessorValueTreeState &apvts, int wsPort = 9876, int udpPort = 9877);
+  explicit RemoteControlServer (juce::AudioProcessorValueTreeState &apvts, int wsPort = constants::network::wsPort,
+                                int udpPort = constants::network::udpPort);
   ~RemoteControlServer () override;
 
   void start ();

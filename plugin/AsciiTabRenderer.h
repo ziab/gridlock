@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Constants.h"
 #include "DrumMap.h"
 #include "GridComponent.h"
 #include "HitEvent.h"
@@ -23,15 +24,15 @@ struct RenderOptions {
 
 struct RenderResult {
   std::string text;
-  double usedIntervalPpq{0.25};
+  double usedIntervalPpq{constants::musical::ppq_default};
   int numSystems{1};
   int totalCols{0};
 };
 
 namespace detail {
-constexpr double kEps = 1e-9;
-constexpr int kLabelWidth = 7;
-constexpr int kMaxGridCols = 4096;
+constexpr double kEps = 1e-9; // local epsilon, keep narrow (see Constants rationale)
+constexpr int kLabelWidth = constants::ui::asciiLabelWidth;
+constexpr int kMaxGridCols = constants::ui::asciiMaxCols;
 
 // ── pure helpers ──
 
@@ -101,13 +102,13 @@ inline double selectInterval (const std::vector<HitEvent> &events, const double 
     return preferredInterval;
   }
 
-  constexpr double kCandidates[] = {0.25, 0.125, 0.0625}; // 1/16, 1/32, 1/64
-  for (const double c : kCandidates) {
+  // candidates for auto interval — reuse shared musical constants
+  for (const double c : constants::musical::candidatesAuto) {
     if (!hasCollision (events, minPpq, maxPpq, c, latencyPpq)) {
       return c;
     }
   }
-  return 0.0625;
+  return constants::musical::ppq_1_64;
 }
 
 inline std::string formatDeviation (const double deltaMs, const float tol) noexcept {
@@ -125,22 +126,23 @@ inline std::string formatDeviation (const double deltaMs, const float tol) noexc
 }
 
 inline std::string intervalLabel (const double ppq) noexcept {
-  if (std::abs (ppq - 0.5) < kEps) {
+  using namespace constants::musical;
+  if (std::abs (ppq - ppq_1_8) < kEps) {
     return "1/8";
   }
-  if (std::abs (ppq - 0.5 * 2.0 / 3.0) < kEps) {
+  if (std::abs (ppq - ppq_1_8T) < kEps) {
     return "1/8T";
   }
-  if (std::abs (ppq - 0.25) < kEps) {
+  if (std::abs (ppq - ppq_1_16) < kEps) {
     return "1/16";
   }
-  if (std::abs (ppq - 0.25 * 2.0 / 3.0) < kEps) {
+  if (std::abs (ppq - ppq_1_16T) < kEps) {
     return "1/16T";
   }
-  if (std::abs (ppq - 0.125) < kEps) {
+  if (std::abs (ppq - ppq_1_32) < kEps) {
     return "1/32";
   }
-  if (std::abs (ppq - 0.0625) < kEps) {
+  if (std::abs (ppq - ppq_1_64) < kEps) {
     return "1/64";
   }
   char buf[16]{};

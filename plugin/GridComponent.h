@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Constants.h"
 #include "DrumMap.h"
 #include "HitEvent.h"
 
@@ -9,14 +10,14 @@
 struct GridViewState {
   double currentPpq{0.0};
   int numBars{4};
-  double gridSubdivisionPpq{0.25};
-  int timeSigNum{4};
+  double gridSubdivisionPpq{constants::musical::ppq_default};
+  int timeSigNum{constants::params::timeSigDefault};
   bool showMsLabels{true};
   bool showVelocityLabels{false};
   bool showNoteNumbers{false};
-  float toleranceMs{20.0f};
-  float latencyOffsetMs{0.0f};
-  float bpm{120.0f};
+  float toleranceMs{constants::params::toleranceDefault};
+  float latencyOffsetMs{constants::params::latencyDefault};
+  float bpm{constants::params::bpmDefault};
 };
 
 class GridComponent : public juce::Component {
@@ -39,17 +40,17 @@ public:
 
 private:
   struct Layout {
-    float labelWidth{110.0f};
-    float rulerHeight{24.0f};
-    float footerHeight{26.0f};
+    float labelWidth{constants::ui::labelWidth};
+    float rulerHeight{constants::ui::rulerHeight};
+    float footerHeight{constants::ui::footerHeight};
     float boundsW{0}, boundsH{0};
     float canvasLeft{0}, canvasW{0};
     float laneAreaTop{0}, laneAreaH{0};
     int numLanes{0};
     float laneH{0};
     float dynamicScale{1.0f};
-    float nodeRadius{11.0f};
-    float strokeW{2.5f};
+    float nodeRadius{constants::ui::nodeRadiusBase};
+    float strokeW{constants::ui::strokeBase};
   };
 
   Layout computeLayout () const;

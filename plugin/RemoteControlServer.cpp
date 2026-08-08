@@ -35,7 +35,7 @@ public:
 
       // Short sleep to avoid busy spinning when no data arrives
       if (!threadShouldExit ()) {
-        sleep (50);
+        sleep (constants::network::udpSleepMs);
       }
     }
   }
@@ -75,8 +75,8 @@ void RemoteControlServer::start () {
     }
   }
 
-  startThread ();    // Accept loop
-  startTimerHz (10); // 10 Hz parameter polling + heartbeat
+  startThread ();                            // Accept loop
+  startTimerHz (constants::network::pollHz); // parameter polling + heartbeat
 }
 
 void RemoteControlServer::stop () {
@@ -106,7 +106,7 @@ void RemoteControlServer::run () {
   while (!threadShouldExit ()) {
     auto client = std::make_unique<juce::StreamingSocket> ();
 
-    if (serverSocket.waitUntilReady (true, 200) == 1) {
+    if (serverSocket.waitUntilReady (true, constants::network::wsAcceptTimeoutMs) == 1) {
       client.reset (serverSocket.waitForNextConnection ());
 
       if (client != nullptr) {
@@ -143,7 +143,7 @@ void RemoteControlServer::timerCallback () {
       }
 
       // Non-blocking read
-      if (sock.waitUntilReady (true, 0) == 1) {
+      if (sock.waitUntilReady (true, constants::network::clientReadyTimeoutMs) == 1) {
         juce::String msg = readWebSocketTextFrame (sock);
 
         if (msg.isNotEmpty ()) {
@@ -299,7 +299,7 @@ juce::String RemoteControlServer::readWebSocketTextFrame (juce::StreamingSocket 
     }
   }
 
-  if (payloadLen > 65536) // Safety limit
+  if (payloadLen > constants::network::wsMaxPayload) // Safety limit
     return {};
 
   std::vector<uint8_t> payload (static_cast<size_t> (payloadLen));
@@ -343,7 +343,7 @@ bool RemoteControlServer::sendWebSocketTextFrame (juce::StreamingSocket &client,
 
   if (len < 126) {
     frame.push_back (static_cast<uint8_t> (len));
-  } else if (len < 65536) {
+  } else if (len < constants::network::wsMaxPayload) {
     frame.push_back (126);
     frame.push_back (static_cast<uint8_t> ((len >> 8) & 0xFF));
     frame.push_back (static_cast<uint8_t> (len & 0xFF));

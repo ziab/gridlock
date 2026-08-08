@@ -1,5 +1,6 @@
 #include "GridComponent.h"
 
+#include "Constants.h"
 #include "Theme.h"
 #include "Timing.h"
 
@@ -117,15 +118,15 @@ GridComponent::Layout GridComponent::computeLayout () const {
 
   float zoomScale = 1.0f;
   if (view.numBars == 2) {
-    zoomScale = 1.4f;
+    zoomScale = constants::ui::zoomScale_2Bars;
   } else if (view.numBars == 1) {
-    zoomScale = 2.0f;
+    zoomScale = constants::ui::zoomScale_1Bar;
   }
 
-  const float windowWidthScale = std::clamp (l.canvasW / 1200.0f, 0.75f, 2.5f);
+  const float windowWidthScale = std::clamp (l.canvasW / constants::ui::canvasRefWidth, 0.75f, 2.5f);
   l.dynamicScale = std::clamp (zoomScale * windowWidthScale, 0.8f, 3.0f);
-  l.nodeRadius = 11.0f * l.dynamicScale;
-  l.strokeW = std::clamp (2.5f * l.dynamicScale, 2.0f, 6.0f);
+  l.nodeRadius = constants::ui::nodeRadiusBase * l.dynamicScale;
+  l.strokeW = std::clamp (constants::ui::strokeBase * l.dynamicScale, 2.0f, 6.0f);
   return l;
 }
 
@@ -144,7 +145,7 @@ void GridComponent::drawRuler (juce::Graphics &g, const Layout &l) const {
 }
 
 void GridComponent::drawLanes (juce::Graphics &g, const Layout &l) const {
-  const float laneHeightScale = std::clamp (l.laneH / 80.0f, 0.75f, 2.5f);
+  const float laneHeightScale = std::clamp (l.laneH / constants::ui::laneHeightRef, 0.75f, 2.5f);
 
   for (int i = 0; i < l.numLanes; ++i) {
     const float y = l.laneAreaTop + (i * l.laneH);

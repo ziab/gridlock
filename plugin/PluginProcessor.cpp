@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 
+#include "Constants.h"
 #include "DrumMap.h"
 #include "PluginEditor.h"
 #include "Timing.h"
@@ -62,17 +63,29 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
 
   addChoice (params, "bars_window", "History Length", {"1 Bar", "2 Bars", "4 Bars", "8 Bars"}, 2);
   addChoice (params, "subdivision", "Grid Subdivision", {"1/8", "1/8T", "1/16", "1/16T", "1/32"}, 2);
-  addFloat (params, "tolerance_ms", "Timing Tolerance", {5.0f, 40.0f, 0.5f}, 20.0f);
-  addFloat (params, "latency_offset_ms", "System Latency Offset", {-500.0f, 500.0f, 1.0f}, 0.0f);
-  addInt (params, "min_velocity", "Velocity Noise Floor", 1, 127, 5);
-  addFloat (params, "internal_bpm", "Internal BPM", {40.0f, 300.0f, 0.1f}, 120.0f);
-  addInt (params, "time_sig_num", "Time Sig Numerator", 2, 12, 4);
+  addFloat (params, "tolerance_ms", "Timing Tolerance",
+            {constants::params::toleranceMin, constants::params::toleranceMax, constants::params::toleranceStep},
+            constants::params::toleranceDefault);
+  addFloat (params, "latency_offset_ms", "System Latency Offset",
+            {constants::params::latencyMin, constants::params::latencyMax, constants::params::latencyStep},
+            constants::params::latencyDefault);
+  addInt (params, "min_velocity", "Velocity Noise Floor", constants::params::velMin, constants::params::velMax,
+          constants::params::velDefault);
+  addFloat (params, "internal_bpm", "Internal BPM",
+            {constants::params::bpmMin, constants::params::bpmMax, constants::params::bpmStep},
+            constants::params::bpmDefault);
+  addInt (params, "time_sig_num", "Time Sig Numerator", constants::params::timeSigMin, constants::params::timeSigMax,
+          constants::params::timeSigDefault);
   addChoice (params, "click_subdivision", "Click Subdivision",
              {"Off", "1/4 Notes", "1/8 Notes", "1/16 Notes", "Triplets"}, 1);
   addChoice (params, "click_sample_preset", "Click Sound Preset",
              {"Wood Clave", "Drum Stick Click", "Digital Beep", "Cowbell"}, 0);
-  addFloat (params, "click_volume", "Click Volume", {0.0f, 2.0f, 0.01f}, 0.8f);
-  addFloat (params, "click_pan", "Click Panning", {-1.0f, 1.0f, 0.05f}, 0.0f);
+  addFloat (params, "click_volume", "Click Volume",
+            {constants::params::clickVolMin, constants::params::clickVolMax, constants::params::clickVolStep},
+            constants::params::clickVolDefault);
+  addFloat (params, "click_pan", "Click Panning",
+            {constants::params::panMin, constants::params::panMax, constants::params::panStep},
+            constants::params::panDefault);
   addBool (params, "click_enabled", "Metronome On/Off", true);
   addBool (params, "is_paused", "Pause/Freeze Grid", false);
   addBool (params, "show_ms_labels", "Display MS Offsets", true);
@@ -85,19 +98,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
 }
 
 double MidiGridAnalyzerAudioProcessor::getSubdivisionPpq (int index) noexcept {
+  using namespace constants::musical;
   switch (index) {
   case 0:
-    return 0.5;
+    return ppq_1_8;
   case 1:
-    return 0.5 * (2.0 / 3.0);
+    return ppq_1_8T;
   case 2:
-    return 0.25;
+    return ppq_1_16;
   case 3:
-    return 0.25 * (2.0 / 3.0);
+    return ppq_1_16T;
   case 4:
-    return 0.125;
+    return ppq_1_32;
   default:
-    return 0.25;
+    return ppq_default;
   }
 }
 
@@ -147,7 +161,7 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
 
   updateHostSyncAndPlayhead (p.internalBpm, p.timeSigNum, p.isPaused);
 
-  const double srToUse = (sampleRate > 0.0) ? sampleRate : 44100.0;
+  const double srToUse = (sampleRate > 0.0) ? sampleRate : constants::params::sampleRateFallback;
   const double blockStartPpq = currentPpqPosition;
   const double blockEndPpq = blockStartPpq + numSamples * (currentBpm / 60.0) / srToUse;
 
