@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'constants/app_theme.dart';
 import 'services/connection_service.dart';
 import 'screens/control_screen.dart';
 
@@ -18,15 +18,7 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Dark status bar to match the app theme
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Color(0xFF0a0c10),
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF0a0c10),
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
+  SystemChrome.setSystemUIOverlayStyle(AppTheme.systemUiOverlay);
 
   runApp(const GridlockCompanionApp());
 }
@@ -41,18 +33,7 @@ class GridlockCompanionApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Gridlock Companion',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: const Color(0xFF0a0c10),
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF00FF88),
-            secondary: Color(0xFF38bdf8),
-            surface: Color(0xFF141722),
-            error: Color(0xFFFF1744),
-          ),
-          textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-          useMaterial3: true,
-        ),
+        theme: AppTheme.dark,
         home: const ControlScreen(),
       ),
     );

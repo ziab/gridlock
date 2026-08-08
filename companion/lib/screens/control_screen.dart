@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../constants/app_colors.dart';
+import '../constants/app_constants.dart';
+import '../models/parameter.dart';
 import '../services/connection_service.dart';
 import '../services/discovery_service.dart';
 import '../services/practice_timer_service.dart';
+import '../utils/net_utils.dart';
 import '../widgets/bpm_ruler_selector.dart';
+import '../widgets/discovery_view.dart';
 import '../widgets/practice_timer_ruler_display.dart';
 import '../widgets/practice_setup_modal.dart';
 import '../widgets/signature_picker.dart';
+import '../widgets/status_bar.dart';
 import '../widgets/subdivision_picker.dart';
 import '../widgets/parameter_card.dart';
 
@@ -54,7 +60,7 @@ class _ControlScreenState extends State<ControlScreen>
     });
 
     final result = await DiscoveryService.discover(
-      timeout: const Duration(seconds: 10),
+      timeout: const Duration(seconds: AppConstants.discoveryUiTimeoutSec),
     );
 
     if (!mounted) return;
@@ -102,199 +108,29 @@ class _ControlScreenState extends State<ControlScreen>
 
   // ── Discovery / Connection View ─────────────────────────────────
   Widget _buildDiscoveryView(ConnectionService connection) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0a0c10),
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  final scale = 1.0 + _pulseController.value * 0.08;
-                  return Transform.scale(
-                    scale: scale,
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const RadialGradient(
-                          colors: [Color(0xFF1e2235), Color(0xFF0f1118)],
-                        ),
-                        border: Border.all(
-                          color: const Color(0xFF00FF88).withValues(alpha: 0.4),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFF00FF88,
-                            ).withValues(alpha: 0.2),
-                            blurRadius: 20,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.grid_on_rounded,
-                        color: Color(0xFF00FF88),
-                        size: 36,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 32),
-              const Text(
-                'GRIDLOCK',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 6,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'COMPANION',
-                style: TextStyle(
-                  color: Color(0xFF8b92a8),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 4,
-                ),
-              ),
-              const SizedBox(height: 40),
-              if (_discovering) ...[
-                const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF00FF88),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Searching for Gridlock on your network…',
-                  style: TextStyle(color: Color(0xFF6b7280), fontSize: 14),
-                ),
-              ],
-              if (_errorMessage != null) ...[
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 32),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF1744).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFFFF1744).withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xFFFF1744),
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-              if (!_discovering) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildRetryButton(),
-                    const SizedBox(width: 12),
-                    _buildManualConnectButton(),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRetryButton() {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        _startDiscovery();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF00FF88).withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFF00FF88).withValues(alpha: 0.4),
-            width: 1.5,
-          ),
-        ),
-        child: const Text(
-          'SCAN AGAIN',
-          style: TextStyle(
-            color: Color(0xFF00FF88),
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 2,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildManualConnectButton() {
-    return GestureDetector(
-      onTap: _showManualConnectDialog,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1e2235),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFF38bdf8).withValues(alpha: 0.4),
-            width: 1.5,
-          ),
-        ),
-        child: const Text(
-          'MANUAL IP',
-          style: TextStyle(
-            color: Color(0xFF38bdf8),
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.5,
-          ),
-        ),
-      ),
+    return DiscoveryView(
+      discovering: _discovering,
+      errorMessage: _errorMessage,
+      pulse: _pulseController,
+      onRetry: _startDiscovery,
+      onManual: _showManualConnectDialog,
     );
   }
 
   Future<void> _showManualConnectDialog() async {
-    final controller = TextEditingController(text: '127.0.0.1:9876');
+    final controller =
+        TextEditingController(text: '${AppConstants.wsDefaultHost}:${AppConstants.wsPort}');
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1a1d2e),
-        title: const Text(
-          'Manual Connection',
-          style: TextStyle(color: Colors.white),
-        ),
+        backgroundColor: AppColors.bgInput,
+        title: const Text('Manual Connection', style: TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Enter Gridlock PC IP & Port:',
-              style: TextStyle(color: Color(0xFF8b92a8), fontSize: 13),
-            ),
+            const Text('Enter Gridlock PC IP & Port:',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
@@ -303,39 +139,27 @@ class _ControlScreenState extends State<ControlScreen>
               decoration: const InputDecoration(
                 hintText: 'e.g. 192.168.1.100:9876',
                 hintStyle: TextStyle(color: Colors.white24),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white24),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF38bdf8)),
-                ),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.skyBlue)),
               ),
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white54),
-            ),
-          ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
           TextButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text(
-              'Connect',
-              style: TextStyle(color: Color(0xFF38bdf8)),
-            ),
-          ),
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Connect', style: TextStyle(color: AppColors.skyBlue))),
         ],
       ),
     );
 
     if (result != null && result.isNotEmpty && mounted) {
-      final parts = result.split(':');
-      final ip = parts[0];
-      final port = parts.length > 1 ? (int.tryParse(parts[1]) ?? 9876) : 9876;
+      final parsed = parseHostPort(result);
+      final ip = parsed.ip;
+      final port = parsed.port;
 
       setState(() {
         _discovering = true;
@@ -368,7 +192,7 @@ class _ControlScreenState extends State<ControlScreen>
     final currentBpm = (bpm?.value ?? 120.0).roundToDouble();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0a0c10),
+      backgroundColor: AppColors.bgMain,
       body: SafeArea(
         child: Column(
           children: [
@@ -396,93 +220,24 @@ class _ControlScreenState extends State<ControlScreen>
   }
 
   Widget _buildStatusBar(ConnectionService connection) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: const Color(0xFF181b24),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: connection.isConnected
-                  ? const Color(0xFF00c853)
-                  : const Color(0xFFFF1744),
-              boxShadow: [
-                BoxShadow(
-                  color:
-                      (connection.isConnected
-                              ? const Color(0xFF00c853)
-                              : const Color(0xFFFF1744))
-                          .withValues(alpha: 0.5),
-                  blurRadius: 6,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            connection.isConnected
-                ? 'Connected to ${connection.serverAddress}'
-                : 'Disconnected',
-            style: const TextStyle(
-              color: Color(0xFF8b92a8),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const Spacer(),
-          IconButton(
-            tooltip: 'Clear Grid',
-            icon: const Icon(
-              Icons.cleaning_services_rounded,
-              color: Color(0xFF00FF88),
-              size: 18,
-            ),
-            onPressed: () {
-              HapticFeedback.mediumImpact();
-              connection.clearGrid();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Grid cleared'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            tooltip: 'Options',
-            icon: const Icon(
-              Icons.tune_rounded,
-              color: Color(0xFF38bdf8),
-              size: 18,
-            ),
-            onPressed: () => _showOptionsModal(context, connection),
-          ),
-          GestureDetector(
-            onTap: () {
-              connection.disconnect();
-              _startDiscovery();
-            },
-            child: const Icon(
-              Icons.refresh_rounded,
-              color: Color(0xFF4b5267),
-              size: 18,
-            ),
-          ),
-        ],
-      ),
+    return StatusBar(
+      connection: connection,
+      onClearGrid: () => connection.clearGrid(),
+      onOptions: () => _showOptionsModal(context, connection),
+      onRefresh: () {
+        connection.disconnect();
+        _startDiscovery();
+      },
     );
   }
 
   Widget _buildPrimaryControls(
     ConnectionService connection,
     PracticeTimerService timerService,
-    dynamic bpm,
+    RemoteParameter? bpm,
     double currentBpm,
-    dynamic timeSig,
-    dynamic clickSub,
+    RemoteParameter? timeSig,
+    RemoteParameter? clickSub,
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -603,7 +358,7 @@ class _ControlScreenState extends State<ControlScreen>
     PracticeTimerService timerService,
   ) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0a0c10),
+      backgroundColor: AppColors.bgMain,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -615,10 +370,10 @@ class _ControlScreenState extends State<ControlScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00FF88).withValues(alpha: 0.15),
+                  color: AppColors.emerald.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: const Color(0xFF00FF88).withValues(alpha: 0.5),
+                    color: AppColors.emerald.withValues(alpha: 0.5),
                   ),
                 ),
                 child: const Row(
@@ -679,7 +434,7 @@ class _ControlScreenState extends State<ControlScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF141722),
+                  color: AppColors.bgCard,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: const Color(0xFF252a3a),
@@ -714,7 +469,7 @@ class _ControlScreenState extends State<ControlScreen>
                             timerService.endBpm >= timerService.startBpm
                                 ? Icons.trending_up_rounded
                                 : Icons.trending_down_rounded,
-                            color: const Color(0xFF38bdf8),
+                            color: AppColors.skyBlue,
                             size: 16,
                           ),
                         ],
@@ -729,7 +484,7 @@ class _ControlScreenState extends State<ControlScreen>
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF1744),
+                    backgroundColor: AppColors.error,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     shape: RoundedRectangleBorder(
@@ -760,10 +515,10 @@ class _ControlScreenState extends State<ControlScreen>
 
   Widget _buildHistoryBarsControl(
     ConnectionService connection,
-    dynamic barsWindow,
+    RemoteParameter? barsWindow,
   ) {
     final currentIndex = (barsWindow?.value ?? 2.0).round();
-    const options = ['1 Bar', '2 Bars', '4 Bars', '8 Bars'];
+    const options = AppConstants.historyOptions;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -833,7 +588,7 @@ class _ControlScreenState extends State<ControlScreen>
                         style: TextStyle(
                           color: isActive
                               ? const Color(0xFFA855F7)
-                              : const Color(0xFF6b7280),
+                              : AppColors.textFaint,
                           fontSize: 16,
                           fontWeight: isActive
                               ? FontWeight.w800
@@ -853,11 +608,11 @@ class _ControlScreenState extends State<ControlScreen>
 
   Widget _buildToleranceControl(
     ConnectionService connection,
-    dynamic tolerance,
+    RemoteParameter? tolerance,
   ) {
     final val = (tolerance?.value ?? 20.0).toDouble();
-    final minVal = (tolerance?.min ?? 5.0).toDouble();
-    final maxVal = (tolerance?.max ?? 40.0).toDouble();
+    final minVal = (tolerance?.min ?? AppConstants.toleranceMin).toDouble();
+    final maxVal = (tolerance?.max ?? AppConstants.toleranceMax).toDouble();
     final divisions = ((maxVal - minVal) * 2).round();
 
     final tier = _getToleranceTier(val);
@@ -990,7 +745,7 @@ class _ControlScreenState extends State<ControlScreen>
     ConnectionService connection,
     PracticeTimerService timerService,
     double currentBpm,
-    Map<String, dynamic> params,
+    Map<String, RemoteParameter> params,
   ) {
     final clickEnabled = params['click_enabled'];
     final isPaused = params['is_paused'];
@@ -1020,10 +775,10 @@ class _ControlScreenState extends State<ControlScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF00FF88).withValues(alpha: 0.15),
+                color: AppColors.emerald.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: const Color(0xFF00FF88).withValues(alpha: 0.5),
+                  color: AppColors.emerald.withValues(alpha: 0.5),
                   width: 1.5,
                 ),
               ),
@@ -1082,7 +837,7 @@ class _ControlScreenState extends State<ControlScreen>
                           : Icons.volume_off_rounded,
                       color: clickOn
                           ? const Color(0xFF00c853)
-                          : const Color(0xFF6b7280),
+                          : AppColors.textFaint,
                       size: 18,
                     ),
                     const SizedBox(width: 6),
@@ -1094,7 +849,7 @@ class _ControlScreenState extends State<ControlScreen>
                           style: TextStyle(
                             color: clickOn
                                 ? const Color(0xFF00c853)
-                                : const Color(0xFF6b7280),
+                                : AppColors.textFaint,
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
@@ -1121,12 +876,12 @@ class _ControlScreenState extends State<ControlScreen>
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: pausedOn
-                      ? const Color(0xFFFF1744).withValues(alpha: 0.2)
+                      ? AppColors.error.withValues(alpha: 0.2)
                       : const Color(0xFF1e2235),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: pausedOn
-                        ? const Color(0xFFFF1744).withValues(alpha: 0.6)
+                        ? AppColors.error.withValues(alpha: 0.6)
                         : const Color(0xFF2d3245),
                     width: 1.5,
                   ),
@@ -1140,8 +895,8 @@ class _ControlScreenState extends State<ControlScreen>
                           ? Icons.pause_circle_filled
                           : Icons.play_arrow_rounded,
                       color: pausedOn
-                          ? const Color(0xFFFF1744)
-                          : const Color(0xFF8b92a8),
+                          ? AppColors.error
+                          : AppColors.textMuted,
                       size: 18,
                     ),
                     const SizedBox(width: 6),
@@ -1152,8 +907,8 @@ class _ControlScreenState extends State<ControlScreen>
                           pausedOn ? 'PAUSED' : 'RUNNING',
                           style: TextStyle(
                             color: pausedOn
-                                ? const Color(0xFFFF1744)
-                                : const Color(0xFF8b92a8),
+                                ? AppColors.error
+                                : AppColors.textMuted,
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
@@ -1174,10 +929,10 @@ class _ControlScreenState extends State<ControlScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF38bdf8).withValues(alpha: 0.15),
+                color: AppColors.skyBlue.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: const Color(0xFF38bdf8).withValues(alpha: 0.5),
+                  color: AppColors.skyBlue.withValues(alpha: 0.5),
                   width: 1.5,
                 ),
               ),
@@ -1194,7 +949,7 @@ class _ControlScreenState extends State<ControlScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0a0c10),
+      backgroundColor: AppColors.bgMain,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

@@ -1,19 +1,18 @@
 import 'dart:async';
 import 'dart:io';
 
+import '../constants/app_constants.dart';
+
 /// Discovers a Gridlock standalone app on the local network via UDP broadcast.
-///
-/// Sends "GRIDLOCK_DISCOVER" on port 9877 and listens for
-/// "GRIDLOCK_HERE:[wsPort]" replies. Returns the first respondent's IP + port.
 class DiscoveryService {
-  static const int _udpPort = 9877;
-  static const String _probe = 'GRIDLOCK_DISCOVER';
-  static const String _replyPrefix = 'GRIDLOCK_HERE:';
+  static const _udpPort = AppConstants.udpPort;
+  static const _probe = AppConstants.probeMessage;
+  static const _replyPrefix = AppConstants.replyPrefix;
 
   /// Scan the network for a Gridlock instance.
   /// Returns (ip, wsPort) or null if nothing found within [timeout].
   static Future<({String ip, int port})?> discover({
-    Duration timeout = const Duration(seconds: 8),
+    Duration timeout = const Duration(seconds: AppConstants.discoveryTimeoutSec),
   }) async {
     RawDatagramSocket? socket;
     try {
@@ -48,7 +47,7 @@ class DiscoveryService {
       final broadcastAddr = InternetAddress('255.255.255.255');
 
       Timer? probeTimer;
-      probeTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      probeTimer = Timer.periodic(const Duration(milliseconds: AppConstants.probeIntervalMs), (timer) {
         if (completer.isCompleted) {
           timer.cancel();
           return;

@@ -1,17 +1,18 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../constants/app_constants.dart';
 
 class PracticeTimerService extends ChangeNotifier {
   Timer? _timer;
   bool _isPracticing = false;
 
-  int _totalDurationSeconds = 300; // default 5 minutes
-  int _remainingSeconds = 300;
+  int _totalDurationSeconds = AppConstants.practiceDefaultSec;
+  int _remainingSeconds = AppConstants.practiceDefaultSec;
 
   bool _hasEndBpm = false;
-  double _startBpm = 120.0;
-  double _endBpm = 160.0;
-  double _currentBpm = 120.0;
+  double _startBpm = AppConstants.practiceStartBpmDefault;
+  double _endBpm = AppConstants.practiceEndBpmDefault;
+  double _currentBpm = AppConstants.practiceStartBpmDefault;
 
   void Function(double bpm)? _onBpmChanged;
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/parameter.dart';
+import '../utils/net_utils.dart';
 
 /// Manages the WebSocket connection to the Gridlock JUCE standalone app.
 ///
@@ -29,15 +30,12 @@ class ConnectionService extends ChangeNotifier {
     disconnect();
 
     try {
-      final cleanIp = ip
-          .replaceAll(RegExp(r'^https?://|^ws://'), '')
-          .split('/')[0]
-          .split(':')[0];
-      final uri = Uri.parse('ws://$cleanIp:$port');
+      final cleaned = cleanIp(ip);
+      final uri = Uri.parse('ws://$cleaned:$port');
       _channel = WebSocketChannel.connect(uri);
       await _channel!.ready;
 
-      _serverIp = cleanIp;
+      _serverIp = cleaned;
       _serverPort = port;
       _connected = true;
 

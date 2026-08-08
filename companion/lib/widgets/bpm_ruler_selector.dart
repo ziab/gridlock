@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/app_constants.dart';
 
 class BpmRulerSelector extends StatefulWidget {
   final double bpm;
@@ -12,8 +13,8 @@ class BpmRulerSelector extends StatefulWidget {
     required this.bpm,
     required this.onChanged,
     this.onChangeEnd,
-    this.minBpm = 30.0,
-    this.maxBpm = 300.0,
+    this.minBpm = AppConstants.bpmRulerMin,
+    this.maxBpm = AppConstants.bpmRulerMax,
   });
 
   @override
@@ -22,7 +23,7 @@ class BpmRulerSelector extends StatefulWidget {
 
 class _BpmRulerSelectorState extends State<BpmRulerSelector> {
   late double _currentOffset;
-  final double _pixelsPerBpm = 12.0; // Control sensitivity
+  final double _pixelsPerBpm = AppConstants.pixelsPerBpm;
 
   @override
   void initState() {
