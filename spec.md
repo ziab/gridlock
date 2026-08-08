@@ -138,6 +138,12 @@ struct HitEvent {
 
 ---
 
+### 4.4a Shared Utilities (`Timing.h`, `Theme.h`, `Crypto.h`)
+* `Timing::compute()` (`plugin/Timing.h`) — single source for `deltaMs/norm/state` (was triplicated in processor + test-beat + renderer).
+* `Theme` (`plugin/Theme.h`) — central `0xff00ff88`/`0xff38bdf8`/backgrounds; replaces 15+ scattered hex literals.
+* `Crypto::sha1()` (`plugin/Crypto.h`) — RFC 3174 SHA-1 extracted from `RemoteControlServer.cpp` for WS handshake `Sec-WebSocket-Accept`.
+* `RingBuffer<N>` (`plugin/RingBuffer.h`) — `juce::AbstractFifo` wrapper; capacity `N` holds `N-1` items (one slot gap) — `4096` → `4095`.
+
 ### 4.4 Centralized E-Kit Drum Map & Constants (`Source/DrumMap.h`)
 * **Single Source of Truth (`DrumMap.h`)**:
   - Centralized General MIDI / Roland e-Kit constants: `Kick` (36), `SnareHead` (38), `SnareRim` (40), `ClosedHiHat` (42), `PedalHiHat` (44), `OpenHiHat` (46), `HighTom` (48), `MidTom` (45), `LowTom` (43), `Crash1` (49), `Ride` (51), `Crash2` (53), `ChineseCymbal` (52), `SplashCymbal` (55), `Crash2Edge` (57), `CymbalEdge29` (29), `CymbalBell30` (30).
@@ -271,7 +277,12 @@ Each parameter object includes:
 
 ---
 
-## 8. Flutter Companion App (`companion/`)
+## 8. Testing (`plugin/LogicTests.cpp`, `plugin/RemoteControlServerTests.cpp`)
+* **Framework:** `juce::UnitTest` / `UnitTestRunner` (no external gtest). `LogicTests` groups 7 suites under `P1` (`Timing`, `HitColor`, `HiHatDebounce`, `Subdivisions`, `Crypto`, `RingBuffer`, `DrumMapLanes`) via `beginTest`/`expect*`.
+* **Integration:** `RemoteControlServerTests` — UDP probe, WS handshake (`s3pPL...`), state/changed frames.
+* **Run:** `cmake --build build --config Debug && ./build/LogicTests_artefacts/Debug/LogicTests` (7/7) + `RemoteControlServerTests` (4/4).
+
+## 9. Flutter Companion App (`companion/`)
 
 ### 8.1 Overview
 A mobile companion app (Android/iOS) that discovers the running Gridlock standalone on the same WiFi network, connects via WebSocket, and provides drum-throne-friendly remote control of metronome and analysis parameters.
