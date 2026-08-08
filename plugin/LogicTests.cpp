@@ -1,3 +1,4 @@
+#include "AsciiTabRenderer.h"
 #include "ClickGenerator.h"
 #include "Crypto.h"
 #include "DrumMap.h"
@@ -91,10 +92,10 @@ public:
         auto emerald = juce::Colour (0xff00ff88);
 
         beginTest ("inside tolerance");
-        expectEquals (GridComponent::getContinuousHitColor (0.0f, tol, maxErr), emerald);
-        expectEquals (GridComponent::getContinuousHitColor (19.9f, tol, maxErr), emerald);
-        expectEquals (GridComponent::getContinuousHitColor (-19.9f, tol, maxErr), emerald);
-        expectEquals (GridComponent::getContinuousHitColor (20.0f, tol, maxErr), emerald);
+        expect (GridComponent::getContinuousHitColor (0.0f, tol, maxErr) == emerald);
+        expect (GridComponent::getContinuousHitColor (19.9f, tol, maxErr) == emerald);
+        expect (GridComponent::getContinuousHitColor (-19.9f, tol, maxErr) == emerald);
+        expect (GridComponent::getContinuousHitColor (20.0f, tol, maxErr) == emerald);
 
         beginTest ("just beyond diverges");
         {
@@ -275,6 +276,130 @@ public:
     }
 };
 static DrumMapLanesTest drumMapLanesTest;
+
+// ── AsciiTabRenderer ──
+class AsciiTabRendererTest : public juce::UnitTest
+{
+public:
+    AsciiTabRendererTest() : UnitTest ("AsciiTabRenderer", "P1") {}
+    void runTest() override
+    {
+        auto makeView = [] (int bars, double interval, double bpm, int ts, float tol, double ppq)
+        {
+            GridViewState v;
+            v.numBars = bars;
+            v.gridSubdivisionPpq = interval;
+            v.bpm = (float) bpm;
+            v.timeSigNum = ts;
+            v.toleranceMs = tol;
+            v.currentPpq = ppq;
+            v.latencyOffsetMs = 0.0f;
+            return v;
+        };
+        auto makeHit = [] (uint8_t note, double ppq, uint8_t vel = 100) {
+            HitEvent h{};
+            h.noteNumber = note;
+            h.velocity = vel;
+            h.rawHitPpqPosition = ppq;
+            h.hitPpqPosition = ppq;
+            return h;
+        };
+
+        beginTest ("empty returns header");
+        {
+            auto view = makeView (4, 0.25, 120.0, 4, 20.0f, 16.0);
+            auto res = AsciiTab::render ({}, view);
+            expect (res.text.find ("Gridlock Tab") != std::string::npos);
+            expect (res.text.find ("Bars 4") != std::string::npos);
+            expectEquals (res.totalCols, 64); // 4*4/0.25
+        }
+
+        beginTest ("single kick at bar start");
+        {
+            auto view = makeView (1, 0.25, 120.0, 4, 20.0f, 4.0);
+            std::vector<HitEvent> ev = { makeHit (DrumMap::Kick, 0.1) };
+            auto res = AsciiTab::render (ev, view);
+            // Kick lane label exists and row contains K
+            expect (res.text.find ("KICK") != std::string::npos);
+            expect (res.text.find ("K") != std::string::npos);
+        }
+
+        beginTest ("auto expands 1/16 -> 1/32 on double-bass collision");
+        {
+            // 4/4, 1 bar, current 4.0, hits at 0.125 apart (32nd) -> collide at 0.25
+            auto view = makeView (1, 0.25, 120.0, 4, 20.0f, 4.0);
+            std::vector<HitEvent> ev = {
+                makeHit (DrumMap::Kick, 0.0),
+                makeHit (DrumMap::Kick, 0.125),
+            };
+            // At 1/16 both map to col 0? Let's see: min 0.0 max 4.0
+            // col = floor((ppq -0)/0.25): 0 and 0 -> collision
+            auto resAuto = AsciiTab::render (ev, view, {}); // auto
+            expectWithinAbsoluteError (resAuto.usedIntervalPpq, 0.125, 1e-9);
+            expectEquals (resAuto.totalCols, 32); // 1*4/0.125
+
+            AsciiTab::RenderOptions fixed; fixed.fixedIntervalPpq = 0.25;
+            auto resFixed = AsciiTab::render (ev, view, fixed);
+            expectWithinAbsoluteError (resFixed.usedIntervalPpq, 0.25, 1e-9);
+            // stacked cell shows '2'
+            expect (resFixed.text.find ("2") != std::string::npos);
+        }
+
+        beginTest ("auto stays at 1/16 when sparse");
+        {
+            auto view = makeView (1, 0.25, 120.0, 4, 20.0f, 4.0);
+            std::vector<HitEvent> ev = {
+                makeHit (DrumMap::Kick, 0.0),
+                makeHit (DrumMap::Kick, 1.0),
+            };
+            auto res = AsciiTab::render (ev, view, {});
+            expectWithinAbsoluteError (res.usedIntervalPpq, 0.25, 1e-9);
+        }
+
+        beginTest ("metalcore 8 bars 32nd blast wraps into systems");
+        {
+            auto view = makeView (8, 0.25, 200.0, 4, 20.0f, 32.0);
+            // Create 16th double bass for entire 8 bars: every 0.25
+            std::vector<HitEvent> ev;
+            for (double p = 0.0; p < 32.0; p += 0.25)
+                ev.push_back (makeHit (DrumMap::Kick, p + 0.02));
+            // Also add hi-hat every 0.5
+            for (double p = 0.0; p < 32.0; p += 0.5)
+                ev.push_back (makeHit (DrumMap::ClosedHiHat, p + 0.01));
+            auto res = AsciiTab::render (ev, view, {});
+            expectGreaterThan (res.numSystems, 1);
+            expect (res.text.find ("System 1/") != std::string::npos);
+            expect (res.text.find ("System 4/") != std::string::npos || res.text.find ("System 2/") != std::string::npos);
+            // Should not be monstrous single line: each system ruler <=64 cols
+            // Check used interval still 0.25 (no collision)
+            expectWithinAbsoluteError (res.usedIntervalPpq, 0.25, 1e-9);
+        }
+
+        beginTest ("1/64 overflow when still colliding at 1/32");
+        {
+            auto view = makeView (1, 0.25, 120.0, 4, 20.0f, 4.0);
+            std::vector<HitEvent> ev = {
+                makeHit (DrumMap::Kick, 0.05),
+                makeHit (DrumMap::Kick, 0.06), // 0.01 ppq apart = 5ms at 120bpm -> still same 1/32 cell
+            };
+            auto res = AsciiTab::render (ev, view, {});
+            expectWithinAbsoluteError (res.usedIntervalPpq, 0.0625, 1e-9);
+            // At 1/64 they still collide (0.01 <0.0625) so stacked '2' remains
+            expect (res.text.find ("2") != std::string::npos);
+        }
+
+        beginTest ("deviation row shown");
+        {
+            auto view = makeView (1, 0.25, 120.0, 4, 20.0f, 4.0);
+            // hit 30ms late -> drag '>'
+            HitEvent h = makeHit (DrumMap::SnareHead, 0.06); // 30ms at 120bpm (0.06 ppq = 0.06/2*1000=30ms)
+            std::vector<HitEvent> ev2 = { h };
+            auto res = AsciiTab::render (ev2, view);
+            expect (res.text.find (">") != std::string::npos || res.text.find ("+") != std::string::npos);
+        }
+    }
+};
+static AsciiTabRendererTest asciiTabRendererTest;
 
 // ── runner ──
 int main ()

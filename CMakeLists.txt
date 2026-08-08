@@ -41,6 +41,7 @@ juce_add_plugin(MidiGridAnalyzer
 
 # Source files
 target_sources(MidiGridAnalyzer PRIVATE
+    plugin/AsciiTabRenderer.h
     plugin/HitEvent.h
     plugin/RingBuffer.h
     plugin/ClickGenerator.h
@@ -103,6 +104,7 @@ juce_add_console_app(LogicTests
 )
 
 target_sources(LogicTests PRIVATE
+    plugin/AsciiTabRenderer.h
     plugin/Crypto.h
     plugin/DrumMap.h
     plugin/GridComponent.h

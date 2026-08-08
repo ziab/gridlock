@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 
+#include "AsciiTabRenderer.h"
 #include "PluginProcessor.h"
 #include "Theme.h"
 
@@ -117,6 +118,21 @@ void MidiGridAnalyzerAudioProcessorEditor::setupControls ()
     styleToggle (showVelButton, Theme::buttonVelOn, Theme::textLabel);
     styleToggle (showNoteNumButton, Theme::buttonNoteOn, Theme::textLabel);
     styleToggle (testButton, Theme::buttonTestOn, Theme::buttonTestOn);
+
+    copyTabButton.setColour (juce::TextButton::buttonColourId, Theme::col (Theme::emerald));
+    copyTabButton.setColour (juce::TextButton::textColourOffId, Theme::col (0xff0a0c10));
+    addAndMakeVisible (copyTabButton);
+    copyTabButton.onClick = [this]
+    {
+        const int barsVal = barsForIndex (barsComboBox.getSelectedItemIndex ());
+        const GridViewState state = buildGridViewState (barsVal);
+        AsciiTab::RenderOptions opts; // Auto + wrapping
+        auto result = AsciiTab::render (eventHistory, state, opts);
+        juce::SystemClipboard::copyTextToClipboard (juce::String (result.text));
+        // brief visual feedback
+        copyTabButton.setButtonText ("Copied!");
+        juce::Timer::callAfterDelay (1200, [this] { copyTabButton.setButtonText ("Copy Tab"); });
+    };
 
     clearButton.setColour (juce::TextButton::buttonColourId, Theme::col (Theme::buttonIdle));
     clearButton.setColour (juce::TextButton::textColourOffId, Theme::col (0xffffffff));
@@ -249,7 +265,7 @@ void MidiGridAnalyzerAudioProcessorEditor::resized ()
         {&timeSigComboBox, 64}, {&clickSubComboBox, 85}, {&clickSoundComboBox, 95},
         {&clickVolumeSlider, 65}, {&clickPanSlider, 65}, {&clickToggleButton, 75},
         {&pauseButton, 65}, {&showMsButton, 85}, {&showVelButton, 76},
-        {&showNoteNumButton, 68}, {&testButton, 85},
+        {&showNoteNumButton, 68}, {&testButton, 85}, {&copyTabButton, 84},
     };
 
     juce::FlexBox fb;

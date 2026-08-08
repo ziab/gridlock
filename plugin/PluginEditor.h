@@ -57,6 +57,7 @@ class MidiGridAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor, 
     juce::TextButton showVelButton{"VELOCITY"};
     juce::TextButton showNoteNumButton{"NOTE #"};
     juce::TextButton testButton{"TEST MODE"};
+    juce::TextButton copyTabButton{"Copy Tab"};
     juce::TextButton clearButton{"Clear Grid"};
 
     juce::Label barsLabel{{}, "Bars:"};
