@@ -8,52 +8,40 @@
 #include <thread>
 
 // Minimal dummy AudioProcessor for APVTS testing
-class DummyAudioProcessor : public juce::AudioProcessor
-{
+class DummyAudioProcessor : public juce::AudioProcessor {
   public:
     DummyAudioProcessor ()
-        : AudioProcessor (BusesProperties ().withOutput ("Output", juce::AudioChannelSet::stereo (), true))
-    {
-    }
+        : AudioProcessor (BusesProperties ().withOutput ("Output", juce::AudioChannelSet::stereo (), true)) {}
 
-    const juce::String getName () const override
-    {
+    const juce::String getName () const override {
         return "DummyProcessor";
     }
     void prepareToPlay (double, int) override {}
     void releaseResources () override {}
     void processBlock (juce::AudioBuffer<float> &, juce::MidiBuffer &) override {}
-    juce::AudioProcessorEditor *createEditor () override
-    {
+    juce::AudioProcessorEditor *createEditor () override {
         return nullptr;
     }
-    bool hasEditor () const override
-    {
+    bool hasEditor () const override {
         return false;
     }
-    bool acceptsMidi () const override
-    {
+    bool acceptsMidi () const override {
         return false;
     }
-    bool producesMidi () const override
-    {
+    bool producesMidi () const override {
         return false;
     }
-    double getTailLengthSeconds () const override
-    {
+    double getTailLengthSeconds () const override {
         return 0.0;
     }
-    int getNumPrograms () override
-    {
+    int getNumPrograms () override {
         return 1;
     }
-    int getCurrentProgram () override
-    {
+    int getCurrentProgram () override {
         return 0;
     }
     void setCurrentProgram (int) override {}
-    const juce::String getProgramName (int) override
-    {
+    const juce::String getProgramName (int) override {
         return {};
     }
     void changeProgramName (int, const juce::String &) override {}
@@ -61,8 +49,7 @@ class DummyAudioProcessor : public juce::AudioProcessor
     void setStateInformation (const void *, int) override {}
 };
 
-static juce::AudioProcessorValueTreeState::ParameterLayout createTestLayout ()
-{
+static juce::AudioProcessorValueTreeState::ParameterLayout createTestLayout () {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID{"internal_bpm", 1}, "Internal BPM",
@@ -79,8 +66,7 @@ static juce::AudioProcessorValueTreeState::ParameterLayout createTestLayout ()
     return {params.begin (), params.end ()};
 }
 
-int main (int argc, char *argv[])
-{
+int main (int argc, char *argv[]) {
     juce::ScopedJuceInitialiser_GUI juceInit;
 
     std::cout << "=== Running RemoteControlServer Integration Tests ===" << std::endl;
@@ -152,8 +138,7 @@ int main (int argc, char *argv[])
     assert ((frameHeader[0] & 0x0F) == 0x01); // Text frame
 
     int payloadLen = frameHeader[1] & 0x7F;
-    if (payloadLen == 126)
-    {
+    if (payloadLen == 126) {
         uint8_t ext[2];
         clientSocket.read (ext, 2, false);
         payloadLen = (ext[0] << 8) | ext[1];
@@ -180,13 +165,13 @@ int main (int argc, char *argv[])
         uint8_t maskKey[4] = {0x12, 0x34, 0x56, 0x78};
         setFrame.insert (setFrame.end (), maskKey, maskKey + 4);
 
-        for (size_t i = 0; i < len; ++i)
+        for (size_t i = 0; i < len; ++i) {
             setFrame.push_back (static_cast<uint8_t> (utf8Msg[i]) ^ maskKey[i % 4]);
+        }
 
         clientSocket.write (setFrame.data (), static_cast<int> (setFrame.size ()));
 
-        for (int i = 0; i < 10; ++i)
-        {
+        for (int i = 0; i < 10; ++i) {
             juce::MessageManager::getInstance ()->runDispatchLoopUntil (50);
             std::this_thread::sleep_for (std::chrono::milliseconds (10));
         }

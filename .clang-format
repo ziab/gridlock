@@ -16,11 +16,23 @@ AlignOperands: Align
 AlignEscapedNewlines: Left
 
 # Braces & Breakers
-BreakBeforeBraces: Allman
-AllowShortBlocksOnASingleLine: Empty
+BreakBeforeBraces: Attach
+AllowShortBlocksOnASingleLine: Never
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  IndentBraces: false
 
 # Spaces
 SpaceBeforeParens: Always

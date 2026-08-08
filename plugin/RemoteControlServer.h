@@ -20,8 +20,7 @@
  *             On param Δ   → pushes {"type":"changed","id":"<paramId>","value":<float>}
  *             Heartbeat    → pushes {"type":"ping"} every 2 s.
  */
-class RemoteControlServer : private juce::Thread, private juce::Timer
-{
+class RemoteControlServer : private juce::Thread, private juce::Timer {
   public:
     explicit RemoteControlServer (juce::AudioProcessorValueTreeState &apvts, int wsPort = 9876, int udpPort = 9877);
     ~RemoteControlServer () override;
@@ -55,8 +54,7 @@ class RemoteControlServer : private juce::Thread, private juce::Timer
 
     juce::StreamingSocket serverSocket;
 
-    struct ConnectedClient
-    {
+    struct ConnectedClient {
         std::unique_ptr<juce::StreamingSocket> socket;
     };
     std::vector<ConnectedClient> clients;

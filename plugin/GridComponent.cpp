@@ -6,39 +6,38 @@
 #include <algorithm>
 #include <cmath>
 
-GridComponent::GridComponent ()
-{
+GridComponent::GridComponent () {
     drumLanes = DrumMap::getStandardDrumLanes ();
 }
 
-int GridComponent::getLaneIndexForNote (uint8_t note) const noexcept
-{
-    for (size_t i = 0; i < drumLanes.size (); ++i)
-        for (uint8_t laneNote : drumLanes[i].notes)
-            if (laneNote == note)
+int GridComponent::getLaneIndexForNote (uint8_t note) const noexcept {
+    for (size_t i = 0; i < drumLanes.size (); ++i) {
+        for (uint8_t laneNote : drumLanes[i].notes) {
+            if (laneNote == note) {
                 return static_cast<int> (i);
+            }
+        }
+    }
     return 5;
 }
 
-bool GridComponent::isNearMultiple (double value, double period, double eps) noexcept
-{
+bool GridComponent::isNearMultiple (double value, double period, double eps) noexcept {
     const double r = std::abs (std::fmod (value, period));
     return r < eps || r > period - eps;
 }
 
-juce::Colour GridComponent::getContinuousHitColor (float deltaMs, float toleranceMs, float maxErrorMs) noexcept
-{
+juce::Colour GridComponent::getContinuousHitColor (float deltaMs, float toleranceMs, float maxErrorMs) noexcept {
     const float absDelta = std::abs (deltaMs);
-    if (absDelta <= toleranceMs)
+    if (absDelta <= toleranceMs) {
         return Theme::col (Theme::emerald);
+    }
 
     const float denom = std::max (0.001f, maxErrorMs - toleranceMs);
     const float t = std::clamp ((absDelta - toleranceMs) / denom, 0.0f, 1.0f);
 
     if (deltaMs < 0.0f) // Rush
     {
-        if (t <= 0.5f)
-        {
+        if (t <= 0.5f) {
             const float k = t / 0.5f;
             return juce::Colour::fromRGB (255, static_cast<juce::uint8> (lerpChannel (k, 234.0f, 145.0f)), 0);
         }
@@ -48,8 +47,7 @@ juce::Colour GridComponent::getContinuousHitColor (float deltaMs, float toleranc
     }
 
     // Drag
-    if (t <= 0.5f)
-    {
+    if (t <= 0.5f) {
         const float k = t / 0.5f;
         return juce::Colour::fromRGB (static_cast<juce::uint8> (lerpChannel (k, 0.0f, 41.0f)),
                                       static_cast<juce::uint8> (lerpChannel (k, 229.0f, 121.0f)), 255);
@@ -60,23 +58,30 @@ juce::Colour GridComponent::getContinuousHitColor (float deltaMs, float toleranc
                                   static_cast<juce::uint8> (lerpChannel (k, 255.0f, 249.0f)));
 }
 
-void GridComponent::update (const GridViewState &state, const std::vector<HitEvent> &events)
-{
+void GridComponent::update (const GridViewState &state, const std::vector<HitEvent> &events) {
     activeEvents = events;
     view = state;
-    if (view.numBars <= 0) view.numBars = 4;
-    if (view.gridSubdivisionPpq <= 0.0) view.gridSubdivisionPpq = 0.25;
-    if (view.timeSigNum <= 0) view.timeSigNum = 4;
-    if (view.toleranceMs < 0.0f) view.toleranceMs = 20.0f;
-    if (view.bpm <= 0.0f) view.bpm = 120.0f;
+    if (view.numBars <= 0) {
+        view.numBars = 4;
+    }
+    if (view.gridSubdivisionPpq <= 0.0) {
+        view.gridSubdivisionPpq = 0.25;
+    }
+    if (view.timeSigNum <= 0) {
+        view.timeSigNum = 4;
+    }
+    if (view.toleranceMs < 0.0f) {
+        view.toleranceMs = 20.0f;
+    }
+    if (view.bpm <= 0.0f) {
+        view.bpm = 120.0f;
+    }
     repaint ();
 }
 
 void GridComponent::updateEvents (const std::vector<HitEvent> &events, double currentPpq, int numBars,
-                                  double gridSubdivisionPpq, int timeSigNum, bool showMsLabels,
-                                  bool showVelocityLabels, bool showNoteNumbers, float toleranceMs,
-                                  float latencyOffsetMs, float bpm)
-{
+                                  double gridSubdivisionPpq, int timeSigNum, bool showMsLabels, bool showVelocityLabels,
+                                  bool showNoteNumbers, float toleranceMs, float latencyOffsetMs, float bpm) {
     GridViewState s;
     s.currentPpq = currentPpq;
     s.numBars = numBars;
@@ -91,8 +96,7 @@ void GridComponent::updateEvents (const std::vector<HitEvent> &events, double cu
     update (s, events);
 }
 
-void GridComponent::clearEvents ()
-{
+void GridComponent::clearEvents () {
     activeEvents.clear ();
     repaint ();
 }
@@ -100,8 +104,7 @@ void GridComponent::clearEvents ()
 void GridComponent::resized () {}
 
 // ── Layout ──
-GridComponent::Layout GridComponent::computeLayout () const
-{
+GridComponent::Layout GridComponent::computeLayout () const {
     Layout l;
     l.boundsW = static_cast<float> (getWidth ());
     l.boundsH = static_cast<float> (getHeight ());
@@ -113,8 +116,11 @@ GridComponent::Layout GridComponent::computeLayout () const
     l.laneH = l.numLanes > 0 ? l.laneAreaH / static_cast<float> (l.numLanes) : 0.0f;
 
     float zoomScale = 1.0f;
-    if (view.numBars == 2) zoomScale = 1.4f;
-    else if (view.numBars == 1) zoomScale = 2.0f;
+    if (view.numBars == 2) {
+        zoomScale = 1.4f;
+    } else if (view.numBars == 1) {
+        zoomScale = 2.0f;
+    }
 
     const float windowWidthScale = std::clamp (l.canvasW / 1200.0f, 0.75f, 2.5f);
     l.dynamicScale = std::clamp (zoomScale * windowWidthScale, 0.8f, 3.0f);
@@ -124,8 +130,7 @@ GridComponent::Layout GridComponent::computeLayout () const
 }
 
 // ── Draw helpers ──
-void GridComponent::drawRuler (juce::Graphics &g, const Layout &l) const
-{
+void GridComponent::drawRuler (juce::Graphics &g, const Layout &l) const {
     g.setColour (Theme::col (Theme::bgHeader));
     g.fillRect (juce::Rectangle<float> (0.0f, 0.0f, l.boundsW, l.rulerHeight));
     g.setColour (Theme::col (Theme::border));
@@ -138,12 +143,10 @@ void GridComponent::drawRuler (juce::Graphics &g, const Layout &l) const
                 juce::Justification::centredLeft, true);
 }
 
-void GridComponent::drawLanes (juce::Graphics &g, const Layout &l) const
-{
+void GridComponent::drawLanes (juce::Graphics &g, const Layout &l) const {
     const float laneHeightScale = std::clamp (l.laneH / 80.0f, 0.75f, 2.5f);
 
-    for (int i = 0; i < l.numLanes; ++i)
-    {
+    for (int i = 0; i < l.numLanes; ++i) {
         const float y = l.laneAreaTop + (i * l.laneH);
         const auto laneRect = juce::Rectangle<float> (0.0f, y, l.boundsW, l.laneH);
 
@@ -162,24 +165,24 @@ void GridComponent::drawLanes (juce::Graphics &g, const Layout &l) const
         g.setColour (Theme::col (Theme::textPrimary));
         g.setFont (juce::Font (laneFontHeight, juce::Font::bold));
         g.drawText (drumLanes[static_cast<size_t> (i)].label,
-                    juce::Rectangle<float> (12.0f, y, l.labelWidth - 16.0f, l.laneH),
-                    juce::Justification::centredLeft, true);
+                    juce::Rectangle<float> (12.0f, y, l.labelWidth - 16.0f, l.laneH), juce::Justification::centredLeft,
+                    true);
     }
 }
 
 void GridComponent::drawGridLines (juce::Graphics &g, const Layout &l, double minPpq, double maxPpq,
-                                   double totalPpqWindow) const
-{
-    if (view.gridSubdivisionPpq <= 0.0)
+                                   double totalPpqWindow) const {
+    if (view.gridSubdivisionPpq <= 0.0) {
         return;
+    }
 
     const double barPpqInterval = static_cast<double> (view.timeSigNum);
     const double firstTick = std::floor (minPpq / view.gridSubdivisionPpq) * view.gridSubdivisionPpq;
 
-    for (double tick = firstTick; tick <= maxPpq + 0.0001; tick += view.gridSubdivisionPpq)
-    {
-        if (tick < minPpq)
+    for (double tick = firstTick; tick <= maxPpq + 0.0001; tick += view.gridSubdivisionPpq) {
+        if (tick < minPpq) {
             continue;
+        }
 
         const float normalizedX = static_cast<float> ((tick - minPpq) / totalPpqWindow);
         const float x = l.canvasLeft + (normalizedX * l.canvasW);
@@ -187,33 +190,29 @@ void GridComponent::drawGridLines (juce::Graphics &g, const Layout &l, double mi
         const bool isBarBoundary = isNearMultiple (tick, barPpqInterval);
         const bool isBeatBoundary = isNearMultiple (tick, 1.0);
 
-        if (isBarBoundary)
-        {
+        if (isBarBoundary) {
             g.setColour (Theme::col (Theme::skyBlue));
             g.drawVerticalLine (static_cast<int> (x), 0.0f, l.boundsH - l.footerHeight);
 
             const int rawBarIdx = static_cast<int> (std::floor (tick / barPpqInterval));
             int wrappedBarIdx = rawBarIdx % view.numBars;
-            if (wrappedBarIdx < 0) wrappedBarIdx += view.numBars;
+            if (wrappedBarIdx < 0) {
+                wrappedBarIdx += view.numBars;
+            }
             g.setFont (juce::Font (12.0f, juce::Font::bold));
             g.drawText ("Bar " + juce::String (wrappedBarIdx + 1),
-                        juce::Rectangle<float> (x + 4.0f, 0.0f, 60.0f, l.rulerHeight),
-                        juce::Justification::centredLeft, false);
-        }
-        else if (isBeatBoundary)
-        {
+                        juce::Rectangle<float> (x + 4.0f, 0.0f, 60.0f, l.rulerHeight), juce::Justification::centredLeft,
+                        false);
+        } else if (isBeatBoundary) {
             g.setColour (juce::Colour (0xff475569));
             g.drawVerticalLine (static_cast<int> (x), l.rulerHeight, l.boundsH - l.footerHeight);
 
             const int beatNumber = static_cast<int> (std::floor (std::fmod (tick, barPpqInterval))) + 1;
             g.setColour (Theme::col (Theme::textMuted));
             g.setFont (juce::Font (11.0f, juce::Font::bold));
-            g.drawText (juce::String (beatNumber),
-                        juce::Rectangle<float> (x + 3.0f, 0.0f, 30.0f, l.rulerHeight),
+            g.drawText (juce::String (beatNumber), juce::Rectangle<float> (x + 3.0f, 0.0f, 30.0f, l.rulerHeight),
                         juce::Justification::centredLeft, false);
-        }
-        else
-        {
+        } else {
             g.setColour (Theme::col (Theme::borderFaint));
             g.drawVerticalLine (static_cast<int> (x), l.rulerHeight, l.boundsH - l.footerHeight);
         }
@@ -221,10 +220,8 @@ void GridComponent::drawGridLines (juce::Graphics &g, const Layout &l, double mi
 }
 
 void GridComponent::drawHitSymbol (juce::Graphics &g, float cx, float cy, float radius, float strokeW, double deltaMs,
-                                   float absDelta, float tolerance, bool showVel, uint8_t velocity) const
-{
-    if (showVel)
-    {
+                                   float absDelta, float tolerance, bool showVel, uint8_t velocity) const {
+    if (showVel) {
         const float h = std::clamp (10.0f * (radius / 11.0f), 9.0f, 22.0f);
         g.setColour (juce::Colour (0xff000000));
         g.setFont (juce::Font (h, juce::Font::bold));
@@ -234,8 +231,7 @@ void GridComponent::drawHitSymbol (juce::Graphics &g, float cx, float cy, float 
         return;
     }
 
-    if (absDelta <= tolerance)
-    {
+    if (absDelta <= tolerance) {
         juce::Path p;
         const float r = radius * 0.55f;
         p.startNewSubPath (cx - r * 0.55f, cy + r * 0.05f);
@@ -253,8 +249,7 @@ void GridComponent::drawHitSymbol (juce::Graphics &g, float cx, float cy, float 
         p.startNewSubPath (cx - r * 0.45f, cy - r * 0.65f);
         p.lineTo (cx + r * 0.45f, cy);
         p.lineTo (cx - r * 0.45f, cy + r * 0.65f);
-    }
-    else // Drag -> <
+    } else // Drag -> <
     {
         p.startNewSubPath (cx + r * 0.45f, cy - r * 0.65f);
         p.lineTo (cx - r * 0.45f, cy);
@@ -265,35 +260,38 @@ void GridComponent::drawHitSymbol (juce::Graphics &g, float cx, float cy, float 
 }
 
 std::pair<int, int> GridComponent::drawHits (juce::Graphics &g, const Layout &l, double minPpq, double maxPpq,
-                                             double totalPpqWindow, double userLatencyPpq, float maxErrorMs) const
-{
+                                             double totalPpqWindow, double userLatencyPpq, float maxErrorMs) const {
     int total = 0, green = 0;
 
-    for (const auto &event : activeEvents)
-    {
+    for (const auto &event : activeEvents) {
         const double rawPpq = (event.rawHitPpqPosition > 0.0) ? event.rawHitPpqPosition : event.hitPpqPosition;
         const double compPpq = rawPpq - userLatencyPpq;
-        if (compPpq < minPpq || compPpq > maxPpq)
+        if (compPpq < minPpq || compPpq > maxPpq) {
             continue;
+        }
 
         const int laneIndex = getLaneIndexForNote (event.noteNumber);
-        if (laneIndex < 0 || laneIndex >= l.numLanes)
+        if (laneIndex < 0 || laneIndex >= l.numLanes) {
             continue;
+        }
 
         const auto timing = Timing::compute (compPpq, view.gridSubdivisionPpq, view.bpm, view.toleranceMs);
         const double liveDeltaMs = timing.deltaMs;
         const float absDelta = static_cast<float> (std::abs (liveDeltaMs));
 
         ++total;
-        if (absDelta <= view.toleranceMs)
+        if (absDelta <= view.toleranceMs) {
             ++green;
+        }
 
         const float normalizedX = static_cast<float> ((compPpq - minPpq) / totalPpqWindow);
         const float hitX = l.canvasLeft + (normalizedX * l.canvasW);
         const float hitY = l.laneAreaTop + (laneIndex * l.laneH) + (l.laneH * 0.5f);
 
-        const juce::Colour fillColour = getContinuousHitColor (static_cast<float> (liveDeltaMs), view.toleranceMs, maxErrorMs);
-        const auto hitRect = juce::Rectangle<float> (hitX - l.nodeRadius, hitY - l.nodeRadius, l.nodeRadius * 2.0f, l.nodeRadius * 2.0f);
+        const juce::Colour fillColour =
+            getContinuousHitColor (static_cast<float> (liveDeltaMs), view.toleranceMs, maxErrorMs);
+        const auto hitRect =
+            juce::Rectangle<float> (hitX - l.nodeRadius, hitY - l.nodeRadius, l.nodeRadius * 2.0f, l.nodeRadius * 2.0f);
 
         g.setColour (Theme::col (Theme::bgMain));
         g.fillEllipse (hitRect.expanded (2.0f * l.dynamicScale));
@@ -303,8 +301,7 @@ std::pair<int, int> GridComponent::drawHits (juce::Graphics &g, const Layout &l,
         drawHitSymbol (g, hitX, hitY, l.nodeRadius, l.strokeW, liveDeltaMs, absDelta, view.toleranceMs,
                        view.showVelocityLabels, event.velocity);
 
-        if (view.showNoteNumbers)
-        {
+        if (view.showNoteNumbers) {
             const juce::String noteText = "#" + juce::String (event.noteNumber);
             const float w = 38.0f * l.dynamicScale, h = 13.0f * l.dynamicScale;
             const auto r = juce::Rectangle<float> (hitX - w * 0.5f, hitY - l.nodeRadius - h - 2.0f, w, h);
@@ -315,10 +312,11 @@ std::pair<int, int> GridComponent::drawHits (juce::Graphics &g, const Layout &l,
             g.drawText (noteText, r, juce::Justification::centred, false);
         }
 
-        if (view.showMsLabels)
-        {
+        if (view.showMsLabels) {
             juce::String msText = juce::String (static_cast<int> (std::round (liveDeltaMs))) + "ms";
-            if (liveDeltaMs > 0.0) msText = "+" + msText;
+            if (liveDeltaMs > 0.0) {
+                msText = "+" + msText;
+            }
             const float w = 44.0f * l.dynamicScale, h = 14.0f * l.dynamicScale;
             const auto r = juce::Rectangle<float> (hitX - w * 0.5f, hitY + l.nodeRadius + 2.0f, w, h);
             g.setColour (juce::Colour (0xd00a0c10));
@@ -332,14 +330,12 @@ std::pair<int, int> GridComponent::drawHits (juce::Graphics &g, const Layout &l,
     return {total, green};
 }
 
-void GridComponent::drawPlayhead (juce::Graphics &g, const Layout &l) const
-{
+void GridComponent::drawPlayhead (juce::Graphics &g, const Layout &l) const {
     g.setColour (Theme::col (Theme::cyan));
     g.drawVerticalLine (static_cast<int> (l.boundsW - 2.0f), 0.0f, l.boundsH - l.footerHeight);
 }
 
-void GridComponent::drawFooter (juce::Graphics &g, const Layout &l, int totalHits, int greenHits) const
-{
+void GridComponent::drawFooter (juce::Graphics &g, const Layout &l, int totalHits, int greenHits) const {
     const float footerY = l.boundsH - l.footerHeight;
     g.setColour (Theme::col (Theme::bgHeader));
     g.fillRect (juce::Rectangle<float> (0.0f, footerY, l.boundsW, l.footerHeight));
@@ -347,9 +343,8 @@ void GridComponent::drawFooter (juce::Graphics &g, const Layout &l, int totalHit
     g.drawHorizontalLine (static_cast<int> (footerY), 0.0f, l.boundsW);
     g.drawVerticalLine (static_cast<int> (l.labelWidth), footerY, l.boundsH);
 
-    const int accuracyPct = totalHits > 0
-                            ? static_cast<int> (std::round (static_cast<double> (greenHits) / totalHits * 100.0))
-                            : 0;
+    const int accuracyPct =
+        totalHits > 0 ? static_cast<int> (std::round (static_cast<double> (greenHits) / totalHits * 100.0)) : 0;
 
     g.setColour (Theme::col (Theme::textMuted));
     g.setFont (juce::Font (11.0f, juce::Font::bold));
@@ -365,8 +360,7 @@ void GridComponent::drawFooter (juce::Graphics &g, const Layout &l, int totalHit
     g.fillRoundedRectangle (juce::Rectangle<float> (barTrackX, barTrackY, barTrackW, barTrackH), 3.0f);
 
     const float fillW = barTrackW * (accuracyPct / 100.0f);
-    if (fillW > 0.0f)
-    {
+    if (fillW > 0.0f) {
         g.setColour (Theme::col (Theme::emerald));
         g.fillRoundedRectangle (juce::Rectangle<float> (barTrackX, barTrackY, fillW, barTrackH), 3.0f);
     }
@@ -375,21 +369,21 @@ void GridComponent::drawFooter (juce::Graphics &g, const Layout &l, int totalHit
     g.drawRoundedRectangle (juce::Rectangle<float> (barTrackX, barTrackY, barTrackW, barTrackH), 3.0f, 1.0f);
 
     const float textX = barTrackX + barTrackW + 16.0f;
-    const juce::String scoreText = juce::String (accuracyPct) + "%  (" + juce::String (greenHits) + " / "
-                                 + juce::String (totalHits) + " On-Grid)";
+    const juce::String scoreText =
+        juce::String (accuracyPct) + "%  (" + juce::String (greenHits) + " / " + juce::String (totalHits) + " On-Grid)";
     g.setColour (Theme::col (Theme::emerald));
     g.setFont (juce::Font (13.0f, juce::Font::bold));
     g.drawText (scoreText, juce::Rectangle<float> (textX, footerY, l.boundsW - textX - 12.0f, l.footerHeight),
                 juce::Justification::centredLeft, true);
 }
 
-void GridComponent::paint (juce::Graphics &g)
-{
+void GridComponent::paint (juce::Graphics &g) {
     g.fillAll (Theme::col (Theme::bgGrid));
 
     const Layout l = computeLayout ();
-    if (l.canvasW <= 10.0f || l.boundsH <= l.rulerHeight + l.footerHeight + 10.0f)
+    if (l.canvasW <= 10.0f || l.boundsH <= l.rulerHeight + l.footerHeight + 10.0f) {
         return;
+    }
 
     drawRuler (g, l);
     drawLanes (g, l);

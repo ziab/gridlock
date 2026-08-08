@@ -7,8 +7,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_opengl/juce_opengl.h>
 
-class MidiGridAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer
-{
+class MidiGridAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer {
   public:
     explicit MidiGridAnalyzerAudioProcessorEditor (MidiGridAnalyzerAudioProcessor &);
     ~MidiGridAnalyzerAudioProcessorEditor () override;
@@ -33,8 +32,10 @@ class MidiGridAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor, 
     static int barsForIndex (int idx) noexcept;
 
     void styleCombo (juce::ComboBox &cb, juce::StringArray items, juce::Label &label, const char *labelText);
-    void styleSlider (juce::Slider &s, juce::Label &label, const char *labelText, int textBoxW, juce::uint32 labelCol = 0xffb0b8c8);
-    void styleToggle (juce::TextButton &b, juce::uint32 onColour, juce::uint32 offText = 0xffffffff, juce::uint32 onText = 0xffffffff);
+    void styleSlider (juce::Slider &s, juce::Label &label, const char *labelText, int textBoxW,
+                      juce::uint32 labelCol = 0xffb0b8c8);
+    void styleToggle (juce::TextButton &b, juce::uint32 onColour, juce::uint32 offText = 0xffffffff,
+                      juce::uint32 onText = 0xffffffff);
 
     MidiGridAnalyzerAudioProcessor &processorRef;
 

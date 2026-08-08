@@ -2,15 +2,9 @@
 
 #include <cstdint>
 
-enum class TimingState
-{
-    OnGrid,
-    Rush,
-    Drag
-};
+enum class TimingState { OnGrid, Rush, Drag };
 
-struct HitEvent
-{
+struct HitEvent {
     uint8_t noteNumber{0};
     uint8_t velocity{0};
     double rawHitPpqPosition{0.0}; // Original uncompensated hit PPQ

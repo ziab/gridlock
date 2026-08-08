@@ -5,8 +5,7 @@
 #include <juce_core/juce_core.h>
 #include <vector>
 
-class ClickGenerator
-{
+class ClickGenerator {
   public:
     ClickGenerator ();
     ~ClickGenerator () = default;
@@ -21,14 +20,12 @@ class ClickGenerator
     double getClickSubdivisionPpq (int index) const noexcept;
 
   private:
-    struct ActiveSample
-    {
+    struct ActiveSample {
         const juce::AudioBuffer<float> *buffer{nullptr};
         int currentSamplePosition{0};
     };
 
-    struct ClickSet
-    {
+    struct ClickSet {
         juce::AudioBuffer<float> highClick; // Accent (Beat 1)
         juce::AudioBuffer<float> midClick;  // Regular Beats
         juce::AudioBuffer<float> subClick;  // Subdivisions

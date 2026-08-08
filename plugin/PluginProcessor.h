@@ -7,11 +7,9 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor
-{
+class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor {
   public:
-    struct ParamSnapshot
-    {
+    struct ParamSnapshot {
         int subChoice{2};
         float toleranceMs{20.0f};
         float userLatencyMs{0.0f};
@@ -38,44 +36,35 @@ class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor
     void processBlock (juce::AudioBuffer<float> &, juce::MidiBuffer &) override;
 
     juce::AudioProcessorEditor *createEditor () override;
-    bool hasEditor () const override
-    {
+    bool hasEditor () const override {
         return true;
     }
 
-    const juce::String getName () const override
-    {
+    const juce::String getName () const override {
         return JucePlugin_Name;
     }
 
-    bool acceptsMidi () const override
-    {
+    bool acceptsMidi () const override {
         return true;
     }
-    bool producesMidi () const override
-    {
+    bool producesMidi () const override {
         return true;
     }
-    bool isMidiEffect () const override
-    {
+    bool isMidiEffect () const override {
         return false;
     }
-    double getTailLengthSeconds () const override
-    {
+    double getTailLengthSeconds () const override {
         return 0.0;
     }
 
-    int getNumPrograms () override
-    {
+    int getNumPrograms () override {
         return 1;
     }
-    int getCurrentProgram () override
-    {
+    int getCurrentProgram () override {
         return 0;
     }
     void setCurrentProgram (int) override {}
-    const juce::String getProgramName (int) override
-    {
+    const juce::String getProgramName (int) override {
         return {};
     }
     void changeProgramName (int, const juce::String &) override {}
@@ -83,29 +72,23 @@ class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor
     void getStateInformation (juce::MemoryBlock &destData) override;
     void setStateInformation (const void *data, int sizeInBytes) override;
 
-    RingBuffer<4096> &getRingBuffer () noexcept
-    {
+    RingBuffer<4096> &getRingBuffer () noexcept {
         return ringBuffer;
     }
-    juce::AudioProcessorValueTreeState &getAPVTS () noexcept
-    {
+    juce::AudioProcessorValueTreeState &getAPVTS () noexcept {
         return apvts;
     }
 
-    double getCurrentPpqPosition () const noexcept
-    {
+    double getCurrentPpqPosition () const noexcept {
         return currentPpqPosition;
     }
-    double getCurrentBpm () const noexcept
-    {
+    double getCurrentBpm () const noexcept {
         return currentBpm;
     }
-    int getCurrentTimeSigNum () const noexcept
-    {
+    int getCurrentTimeSigNum () const noexcept {
         return currentTimeSigNum;
     }
-    bool isStandaloneAppMode () const noexcept
-    {
+    bool isStandaloneAppMode () const noexcept {
         return isStandaloneMode;
     }
 
@@ -125,8 +108,8 @@ class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor
     void generateTestModeBeat (double blockStartPpq, double blockEndPpq, double totalLatencyPpq, double gridInterval,
                                float toleranceMs);
     double generateHumanizedDeviationMs (float toleranceMs);
-    HitEvent makeQuantizedHit (uint8_t note, uint8_t vel, double targetCompPpq, double gridInterval,
-                               double bpm, float toleranceMs, double totalLatencyPpq) const;
+    HitEvent makeQuantizedHit (uint8_t note, uint8_t vel, double targetCompPpq, double gridInterval, double bpm,
+                               float toleranceMs, double totalLatencyPpq) const;
 
     juce::AudioProcessorValueTreeState apvts;
     RingBuffer<4096> ringBuffer;

@@ -6,8 +6,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <vector>
 
-struct GridViewState
-{
+struct GridViewState {
     double currentPpq{0.0};
     int numBars{4};
     double gridSubdivisionPpq{0.25};
@@ -20,8 +19,7 @@ struct GridViewState
     float bpm{120.0f};
 };
 
-class GridComponent : public juce::Component
-{
+class GridComponent : public juce::Component {
   public:
     GridComponent ();
     ~GridComponent () override = default;
@@ -40,8 +38,7 @@ class GridComponent : public juce::Component
     static juce::Colour getContinuousHitColor (float deltaMs, float toleranceMs, float maxErrorMs) noexcept;
 
   private:
-    struct Layout
-    {
+    struct Layout {
         float labelWidth{110.0f};
         float rulerHeight{24.0f};
         float footerHeight{26.0f};
@@ -68,7 +65,9 @@ class GridComponent : public juce::Component
     void drawFooter (juce::Graphics &g, const Layout &l, int totalHits, int greenHits) const;
 
     static bool isNearMultiple (double value, double period, double eps = 0.001) noexcept;
-    static float lerpChannel (float t, float a, float b) noexcept { return juce::jmap (t, a, b); }
+    static float lerpChannel (float t, float a, float b) noexcept {
+        return juce::jmap (t, a, b);
+    }
 
     std::vector<HitEvent> activeEvents;
     GridViewState view;

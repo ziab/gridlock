@@ -4,8 +4,7 @@
 #include <juce_core/juce_core.h>
 #include <vector>
 
-namespace DrumMap
-{
+namespace DrumMap {
 // Standard General MIDI / Roland e-Kit Note Numbers
 constexpr uint8_t CymbalEdge29 = 29;    // Roland Cymbal Edge / Crash 2 Rim
 constexpr uint8_t CymbalBell30 = 30;    // Roland Cymbal Bell / Splash Rim
@@ -29,8 +28,7 @@ constexpr uint8_t Crash2Edge = 57;      // A2 (Crash 2 Edge)
 constexpr uint8_t RideEdge = 59;        // B2 (Ride Edge)
 
 // Test Mode Velocity Synthesis Parameters
-namespace TestModeVelocity
-{
+namespace TestModeVelocity {
 constexpr uint8_t BaseHiHat = 95;
 constexpr int HiHatRange = 15;
 
@@ -43,8 +41,7 @@ constexpr int SnareRange = 8;
 constexpr uint8_t Crash = 125;
 } // namespace TestModeVelocity
 
-struct LaneInfo
-{
+struct LaneInfo {
     juce::String label;
     std::vector<uint8_t> notes;
 };
@@ -66,22 +63,19 @@ struct LaneInfo
 static constexpr double kHiHatDebounceMinMs = 60.0;
 static constexpr double kHiHatDebounceMaxMs = 200.0;
 
-inline double hiHatDebounceWindowMs (uint8_t velocity) noexcept
-{
+inline double hiHatDebounceWindowMs (uint8_t velocity) noexcept {
     const double v = static_cast<double> (velocity) / 127.0; // normalise 0..1
     const double t = v * v;                                  // quadratic - non-linear boost for loud hits
     return kHiHatDebounceMaxMs - (kHiHatDebounceMaxMs - kHiHatDebounceMinMs) * t;
 }
 
 // Notes to exclude entirely from the grid display (currently no notes excluded)
-inline bool isExcluded (uint8_t note) noexcept
-{
+inline bool isExcluded (uint8_t note) noexcept {
     juce::ignoreUnused (note);
     return false;
 }
 
-inline const std::vector<LaneInfo> &getStandardDrumLanes ()
-{
+inline const std::vector<LaneInfo> &getStandardDrumLanes () {
     static const std::vector<LaneInfo> lanes = {
         {"CYMBALS",
          {CymbalEdge29, CymbalBell30, Crash1, Ride, ChineseCymbal, Crash2, SplashCymbal, Crash2Edge, RideEdge}},
