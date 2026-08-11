@@ -847,10 +847,26 @@ class _ControlScreenState extends State<ControlScreen>
     } else if (isDone) {
       final hasRes = connection.calibrationHasResult && connection.calibrationHitCount > 0;
       if (!hasRes) {
-        label = 'NO HITS — KEEP OLD';
+        final reason = connection.calibrationReason;
+        final hits = connection.calibrationHitCount;
+        final exp = connection.calibrationExpectedHits;
+        final sd = connection.calibrationSdMs;
+        final bpmTxt = connection.calibrationBpm.toStringAsFixed(0);
         bg = const Color(0xFF6b7280).withValues(alpha: 0.15);
         border = const Color(0xFF6b7280).withValues(alpha: 0.5);
-        subtitle = 'Hit every subdiv @ ${connection.calibrationBpm.toStringAsFixed(0)} BPM — try again';
+        if (reason == 'noHits' || hits == 0) {
+          label = 'NO HITS — RETRY';
+          subtitle = '0/$exp hits @ $bpmTxt BPM — hit every subdiv';
+        } else if (reason == 'tooFew') {
+          label = 'TOO FEW — RETRY';
+          subtitle = '$hits/$exp hits — need ${(exp * 0.5).ceil()} + steady hits';
+        } else if (reason == 'jitter') {
+          label = 'UNSTABLE — RETRY';
+          subtitle = 'SD ${sd.toStringAsFixed(1)}ms — keep time steadier';
+        } else {
+          label = 'NO HITS — RETRY';
+          subtitle = 'Hit every subdiv @ $bpmTxt BPM — try again';
+        }
       } else {
         final clamped = connection.calibrationMeanMs.clamp(0.0, 500.0);
         label = 'APPLY ${clamped.toStringAsFixed(1)}ms?';

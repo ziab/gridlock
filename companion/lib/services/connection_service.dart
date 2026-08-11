@@ -130,6 +130,7 @@ class ConnectionService extends ChangeNotifier {
   int calibrationHitCount = 0;
   int calibrationExpectedHits = 0;
   bool calibrationHasResult = false;
+  String calibrationReason = ''; // ""|noHits|tooFew|jitter
   double calibrationBpm = 120.0;
   int calibrationTimeSigNum = 4;
   String calibrationGridInterval = '';
@@ -202,6 +203,17 @@ class ConnectionService extends ChangeNotifier {
     calibrationHitCount = (json['hitCount'] as num?)?.toInt() ?? 0;
     calibrationExpectedHits = (json['expectedHits'] as num?)?.toInt() ?? 0;
     calibrationHasResult = (json['hasResult'] as bool?) ?? false;
+    calibrationReason = (json['reason'] as String?) ?? '';
+    // Fallback inference for old servers without reason
+    if (!calibrationHasResult && calibrationReason.isEmpty) {
+      if (calibrationHitCount == 0) {
+        calibrationReason = 'noHits';
+      } else if (calibrationHitCount < calibrationExpectedHits * 0.5) {
+        calibrationReason = 'tooFew';
+      } else if (calibrationSdMs > 20.0) {
+        calibrationReason = 'jitter';
+      }
+    }
     calibrationBpm = (json['bpm'] as num?)?.toDouble() ?? 120.0;
     calibrationTimeSigNum = (json['timeSigNum'] as num?)?.toInt() ?? 4;
     // Auto-reset DONE -> idle after 3s only when no valid result (no hits / jitter)

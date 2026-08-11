@@ -593,14 +593,20 @@ void MidiGridAnalyzerAudioProcessor::finalizeCalibration () {
         r.meanMs = trimmedSum / trimmedCount;
       }
     }
-    // Corner cases: keep old latency
-    // 0 hits already hasResult false above
-    // High jitter (SD > 20ms) or <50% hits -> indecisive
-    if (r.hasResult) {
+    // Corner cases: keep old latency — record reason for UI
+    if (r.hitCount == 0) {
+      r.failReason = "noHits";
+    } else if (r.hasResult) {
       const bool tooFew = r.hitCount < (r.expectedHits * 0.5);
       const bool jitterHigh = r.sdMs > 20.0;
-      if (tooFew || jitterHigh) {
+      if (tooFew) {
         r.hasResult = false;
+        r.failReason = "tooFew";
+      } else if (jitterHigh) {
+        r.hasResult = false;
+        r.failReason = "jitter";
+      } else {
+        r.failReason = "";
       }
     }
     // Clamp negative (rush) to 0 — latency cannot be negative
@@ -665,6 +671,7 @@ juce::String MidiGridAnalyzerAudioProcessor::getCalibrationStateJson () const {
   obj->setProperty ("hitCount", hitCountToReport);
   obj->setProperty ("expectedHits", r.expectedHits > 0 ? r.expectedHits : calibExpectedHits);
   obj->setProperty ("hasResult", hasResToReport);
+  obj->setProperty ("reason", r.failReason);
   // Include grid context for UI
   obj->setProperty ("bpm", calibBpm);
   obj->setProperty ("gridInterval", calibGridInterval);

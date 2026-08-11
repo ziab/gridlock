@@ -125,6 +125,7 @@ public:
     int hitCount{0};
     int expectedHits{0};
     bool hasResult{false};
+    juce::String failReason; // empty if hasResult, else "noHits"|"tooFew"|"jitter"
   };
   void startCalibration ();
   void cancelCalibration ();
