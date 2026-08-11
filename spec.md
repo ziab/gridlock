@@ -166,6 +166,11 @@ struct HitEvent {
 
 ---
 
+### 4.5b Calibration Wizard (`PluginProcessor.cpp:440` / `GridComponent`+`control_screen.dart:821` w)
+* **Flow:** `Idle` → (user `CALIBRATE`) → `CountIn` (1 bar grid-synced to next `timeSigNum` quarters, throne overlay) → `Recording` (4 bars, `expectedHits=round(4*timeSig/interval)` where `interval=getEffectiveGridInterval()` = click `1/4|1/8|1/16|Triplet` if `click_enabled` else `subdivision` `1/8|1/8T|1/16|1/16T|1/32` ) → `Done` (`mean/median/SD`, `failReason` `noHits`/`tooFew` `<50%`/`jitter` `SD>20`), `mean<0` clamped 0. `hitCount` via `nearestGrid` in `[recStart,recEnd)` using `calibLatencyPpq` (`auto+device`, excl. `user`). Trim outliers `>2*SD` for final mean. `Apply` (replace) / `Add` / `Cancel` via `RemoteControlServer` `calibrate`/`calibration_apply`/`calibration_cancel`.
+* **Broadcast:** `{"type":"calibration","state":"countin|recording|done","progress":0..1,"beatsRemaining":int,"hitCount":int,"expectedHits":int,"hasResult":bool,"reason":""|"noHits"|"tooFew"|"jitter","meanMs":float,"medianMs":float,"sdMs":float,"bpm":float,"gridInterval":float,"timeSigNum":int}` at 10Hz + Done. Companion `control_screen.dart:848` maps `reason` → short button `NO HITS — RETRY`/`TOO FEW — RETRY`/`UNSTABLE — RETRY` (fits 340px) + subtitle with `hits/exp`/`SD`.
+* **E2E:** `companion/bin/calibration_e2e.dart` headless UDP `9877`+WS `9876`, sets `subdivision 1/8` + `click off` → `32/32` `hasResult true`, verifies live `hitCount>0` progress.
+
 ### 4.5 Rolling Window Accuracy Score Bar (`GridComponent.cpp`)
 * **Accuracy Percentage Calculation**:
   - Evaluated continuously over all visible notes in active history window (`barsWindow`).
