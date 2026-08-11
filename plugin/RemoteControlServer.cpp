@@ -56,6 +56,15 @@ RemoteControlServer::~RemoteControlServer () {
   stop ();
 }
 
+void RemoteControlServer::setCalibrationCallbacks (std::function<void ()> onCal, std::function<void (bool)> onApply,
+                                                   std::function<void ()> onCancel,
+                                                   std::function<juce::String ()> getJson) {
+  onCalibrate = std::move (onCal);
+  onCalibrationApply = std::move (onApply);
+  onCalibrationCancel = std::move (onCancel);
+  getCalibrationJson = std::move (getJson);
+}
+
 void RemoteControlServer::start () {
   // Start UDP discovery thread
   discoveryThread = std::make_unique<DiscoveryListenerThread> (udpPort, wsPort);
@@ -177,6 +186,13 @@ void RemoteControlServer::timerCallback () {
 
         broadcastToClients (juce::JSON::toString (json.get ()));
       }
+    }
+  }
+
+  // 3. Broadcast calibration state if needed
+  if (getCalibrationJson) {
+    if (auto json = getCalibrationJson (); json.isNotEmpty ()) {
+      broadcastToClients (json);
     }
   }
 }
@@ -398,6 +414,19 @@ void RemoteControlServer::handleClientMessage (juce::StreamingSocket & /*client*
   } else if (type == "clear_grid") {
     // Acknowledge clear grid request to clients
     broadcastToClients ("{\"type\":\"clear_ack\"}");
+  } else if (type == "calibrate") {
+    if (onCalibrate) {
+      onCalibrate ();
+    }
+  } else if (type == "calibration_apply") {
+    if (onCalibrationApply) {
+      const bool add = obj->hasProperty ("add") ? static_cast<bool> (obj->getProperty ("add")) : false;
+      onCalibrationApply (add);
+    }
+  } else if (type == "calibration_cancel") {
+    if (onCalibrationCancel) {
+      onCalibrationCancel ();
+    }
   }
 }
 

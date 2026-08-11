@@ -27,6 +27,7 @@ private:
   void evictOldEvents (double currentPpq, int barsVal);
   GridViewState buildGridViewState (int barsVal) const;
   void updateDeviceLatency ();
+  void updateCalibrationUI ();
 
   static int indexForTimeSig (int num) noexcept;
   static int timeSigForIndex (int idx) noexcept;
@@ -59,6 +60,8 @@ private:
   juce::TextButton showVelButton{"VELOCITY"};
   juce::TextButton showNoteNumButton{"NOTE #"};
   juce::TextButton testButton{"TEST MODE"};
+  juce::TextButton calibrateButton{"CALIBRATE"};
+  juce::Label calibCountOverlay{{}, ""};
   juce::TextButton copyTabButton{"Copy Tab"};
   juce::TextButton clearButton{"Clear Grid"};
 
@@ -99,6 +102,8 @@ private:
   std::unique_ptr<ButtonAttachment> testAttachment;
 
   std::vector<HitEvent> eventHistory;
+
+  int lastCalibStateSeen{0};
 
   juce::OpenGLContext openGLContext;
 

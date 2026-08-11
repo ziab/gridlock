@@ -119,6 +119,29 @@ void MidiGridAnalyzerAudioProcessorEditor::setupControls () {
   styleSlider (clickVolumeSlider, clickVolLabel, "Click Vol:", 35);
   styleSlider (clickPanSlider, clickPanLabel, "Click Pan:", 35);
 
+  calibrateButton.setColour (juce::TextButton::buttonColourId, Theme::col (Theme::skyBlue));
+  calibrateButton.setColour (juce::TextButton::textColourOffId, Theme::col (0xff0a0c10));
+  addAndMakeVisible (calibrateButton);
+  calibrateButton.onClick = [this] {
+    auto st = processorRef.getCalibrationState ();
+    if (st == MidiGridAnalyzerAudioProcessor::CalibState::Idle) {
+      processorRef.startCalibration ();
+    } else {
+      // PC is passive — Done state is handled in companion if online.
+      // Allow cancel from PC for CountIn/Recording or Done->Idle reset.
+      processorRef.cancelCalibration ();
+    }
+  };
+
+  // Throne-readable count-in overlay (grid-synced, shows on PC)
+  calibCountOverlay.setFont (juce::Font (96.0f, juce::Font::bold));
+  calibCountOverlay.setColour (juce::Label::textColourId, Theme::col (Theme::emerald));
+  calibCountOverlay.setColour (juce::Label::backgroundColourId, juce::Colour (0xaa0a0c10));
+  calibCountOverlay.setJustificationType (juce::Justification::centred);
+  calibCountOverlay.setVisible (false);
+  calibCountOverlay.setInterceptsMouseClicks (false, false);
+  addAndMakeVisible (calibCountOverlay);
+
   styleToggle (clickToggleButton, Theme::buttonClickOn);
   styleToggle (pauseButton, Theme::buttonPauseOn, 0xffffffff, 0xff000000);
   pauseButton.onStateChange = [this] {
@@ -286,6 +309,7 @@ GridViewState MidiGridAnalyzerAudioProcessorEditor::buildGridViewState (int bars
 
 void MidiGridAnalyzerAudioProcessorEditor::timerCallback () {
   updateDeviceLatency ();
+  updateCalibrationUI ();
   drainRingBuffer ();
 
   const double currentPpq = processorRef.getCurrentPpqPosition ();
@@ -294,6 +318,51 @@ void MidiGridAnalyzerAudioProcessorEditor::timerCallback () {
 
   const GridViewState state = buildGridViewState (barsVal);
   gridComponent.update (state, eventHistory);
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::updateCalibrationUI () {
+  const auto st = processorRef.getCalibrationState ();
+  const int stInt = static_cast<int> (st);
+  if (st == MidiGridAnalyzerAudioProcessor::CalibState::Idle) {
+    calibrateButton.setButtonText ("CALIBRATE");
+    calibrateButton.setEnabled (true);
+    calibCountOverlay.setVisible (false);
+    lastCalibStateSeen = stInt;
+    return;
+  }
+  if (st == MidiGridAnalyzerAudioProcessor::CalibState::CountIn) {
+    const int beats = processorRef.getCalibrationBeatsRemaining ();
+    calibrateButton.setButtonText (juce::String (beats) + "...");
+    calibCountOverlay.setText (juce::String (beats), juce::dontSendNotification);
+    calibCountOverlay.setVisible (true);
+    calibCountOverlay.toFront (false);
+    lastCalibStateSeen = stInt;
+    return;
+  }
+  if (st == MidiGridAnalyzerAudioProcessor::CalibState::Recording) {
+    const double prog = processorRef.getCalibrationProgress ();
+    const int pct = static_cast<int> (std::round (prog * 100.0));
+    calibrateButton.setButtonText ("REC " + juce::String (pct) + "%");
+    calibCountOverlay.setText ("GO!", juce::dontSendNotification);
+    calibCountOverlay.setVisible (true);
+    calibCountOverlay.toFront (false);
+    lastCalibStateSeen = stInt;
+    return;
+  }
+  if (st == MidiGridAnalyzerAudioProcessor::CalibState::Done) {
+    // PC is passive — companion shows Apply/Add dialog if online.
+    // Just show DONE for 3s then auto-reset to CALIBRATE (throne-friendly)
+    calibrateButton.setButtonText ("DONE");
+    calibCountOverlay.setVisible (false);
+    if (lastCalibStateSeen != stInt) {
+      juce::Timer::callAfterDelay (3000, [this] {
+        if (processorRef.getCalibrationState () == MidiGridAnalyzerAudioProcessor::CalibState::Done) {
+          processorRef.cancelCalibration ();
+        }
+      });
+    }
+    lastCalibStateSeen = stInt;
+  }
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::paint (juce::Graphics &g) {
@@ -315,11 +384,11 @@ void MidiGridAnalyzerAudioProcessorEditor::resized () {
   };
   // Widths mirror previous manual layout; FlexBox makes intent explicit and handles overflow.
   Item items[] = {
-      {&barsComboBox, 74},       {&subdivisionComboBox, 74}, {&toleranceSlider, 85},   {&latencySlider, 85},
-      {&deviceLatencyLabel, 98}, {&velocitySlider, 65},      {&bpmSlider, 75},         {&timeSigComboBox, 64},
-      {&clickSubComboBox, 85},   {&clickSoundComboBox, 95},  {&clickVolumeSlider, 65}, {&clickPanSlider, 65},
-      {&clickToggleButton, 75},  {&pauseButton, 65},         {&showMsButton, 85},      {&showVelButton, 76},
-      {&showNoteNumButton, 68},  {&testButton, 85},          {&copyTabButton, 84},
+      {&barsComboBox, 74},       {&subdivisionComboBox, 74}, {&toleranceSlider, 85},    {&latencySlider, 85},
+      {&deviceLatencyLabel, 98}, {&calibrateButton, 86},     {&velocitySlider, 65},     {&bpmSlider, 75},
+      {&timeSigComboBox, 64},    {&clickSubComboBox, 85},    {&clickSoundComboBox, 95}, {&clickVolumeSlider, 65},
+      {&clickPanSlider, 65},     {&clickToggleButton, 75},   {&pauseButton, 65},        {&showMsButton, 85},
+      {&showVelButton, 76},      {&showNoteNumButton, 68},   {&testButton, 85},         {&copyTabButton, 84},
   };
 
   juce::FlexBox fb;
@@ -340,4 +409,6 @@ void MidiGridAnalyzerAudioProcessorEditor::resized () {
   fb.performLayout (headerArea);
 
   gridComponent.setBounds (0, headerH, getWidth (), getHeight () - headerH);
+  // Count-in overlay centered over grid (throne-readable, grid-synced)
+  calibCountOverlay.setBounds (getWidth () / 2 - 120, headerH + getHeight () / 2 - 80, 240, 120);
 }

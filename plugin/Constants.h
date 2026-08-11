@@ -11,7 +11,7 @@ constexpr float toleranceMax = 40.0f;
 constexpr float toleranceStep = 0.5f;
 constexpr float toleranceDefault = 20.0f;
 
-constexpr float latencyMin = -500.0f;
+constexpr float latencyMin = 0.0f;
 constexpr float latencyMax = 500.0f;
 constexpr float latencyStep = 1.0f;
 constexpr float latencyDefault = 0.0f;

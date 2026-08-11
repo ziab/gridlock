@@ -48,6 +48,9 @@ MidiGridAnalyzerAudioProcessor::MidiGridAnalyzerAudioProcessor ()
 
   if (isStandaloneMode) {
     remoteServer = std::make_unique<RemoteControlServer> (apvts);
+    remoteServer->setCalibrationCallbacks (
+        [this] { startCalibration (); }, [this] (bool add) { applyCalibrationResult (add); },
+        [this] { cancelCalibration (); }, [this] { return getCalibrationStateJson (); });
     remoteServer->start ();
   }
 }
@@ -185,6 +188,9 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
   const double blockStartPpq = currentPpqPosition;
   const double blockEndPpq = blockStartPpq + numSamples * (currentBpm / 60.0) / srToUse;
 
+  // Calibration state transitions (count-in -> recording -> done)
+  updateCalibrationState (blockStartPpq, blockEndPpq);
+
   if (isStandaloneMode && !p.isPaused) {
     clickGenerator.renderBlock (buffer, numSamples, srToUse, blockStartPpq, currentBpm, currentTimeSigNum,
                                 p.clickSubChoice, p.clickPreset, p.clickVolume, p.clickPan, p.clickEnabled);
@@ -192,11 +198,18 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
 
   const double autoLatencyMs = (static_cast<double> (getLatencySamples ()) / srToUse) * 1000.0;
   const double deviceLatencyMs = getDeviceLatencyMs (srToUse);
-  const double totalLatencyMs = autoLatencyMs + deviceLatencyMs + static_cast<double> (p.userLatencyMs);
+  const double userLatencyMs = static_cast<double> (p.userLatencyMs);
+  const double totalLatencyMs = autoLatencyMs + deviceLatencyMs + userLatencyMs;
   const double totalLatencyPpq = (totalLatencyMs / 1000.0) * (currentBpm / 60.0);
+  // For calibration: measure absolute offset EXCLUDING current user latency
+  // (so result can replace, not add). Use snapshot calibBpm if calibrating.
+  const double calibLatencyMs = autoLatencyMs + deviceLatencyMs;
+  const double calibBpmForPpq = (calibState.load () != static_cast<int> (CalibState::Idle)) ? calibBpm : currentBpm;
+  const double calibLatencyPpq = (calibLatencyMs / 1000.0) * (calibBpmForPpq / 60.0);
 
   if (!p.isPaused) {
-    processIncomingMidi (midiMessages, srToUse, gridInterval, p.toleranceMs, p.minVelocity, totalLatencyPpq);
+    processIncomingMidi (midiMessages, srToUse, gridInterval, p.toleranceMs, p.minVelocity, totalLatencyPpq,
+                         calibLatencyPpq);
   }
 
   if (p.testMode && !p.isPaused && currentTimeSigNum > 0) {
@@ -264,7 +277,8 @@ bool MidiGridAnalyzerAudioProcessor::updateHiHatHistoryAndShouldFilter (uint8_t 
 
 void MidiGridAnalyzerAudioProcessor::processIncomingMidi (const juce::MidiBuffer &midiMessages, double srToUse,
                                                           double gridInterval, float toleranceMs, int minVelocity,
-                                                          double totalLatencyPpq) {
+                                                          double totalLatencyPpq, double calibLatencyPpq) {
+  const bool isCalibRec = (calibState.load () == static_cast<int> (CalibState::Recording));
   for (const auto metadata : midiMessages) {
     const auto msg = metadata.getMessage ();
     if (!(msg.isNoteOn () && msg.getVelocity () >= minVelocity &&
@@ -293,6 +307,20 @@ void MidiGridAnalyzerAudioProcessor::processIncomingMidi (const juce::MidiBuffer
     event.normalizedDeviation = timing.normalizedDeviation;
     event.state = timing.state;
     ringBuffer.push (event);
+
+    // Calibration capture: measure absolute offset EXCLUDING current user latency
+    // (so result can replace user latency, not add to it). Use raw - (auto+device) only.
+    // Count hits whose nearest calibration grid lies within the recording window,
+    // so early/late hits just outside window (rush/drag) are still counted.
+    if (isCalibRec) {
+      const double calibCompPpq = rawHitPpq - calibLatencyPpq;
+      const double nearestGrid = std::round (calibCompPpq / calibGridInterval) * calibGridInterval;
+      if (nearestGrid >= calibRecStartPpq - 1e-9 && nearestGrid < calibRecEndPpq - 1e-9) {
+        const auto calibTiming = Timing::compute (calibCompPpq, calibGridInterval, calibBpm, toleranceMs);
+        std::lock_guard<std::mutex> lock (calibMutex);
+        calibDeltas.push_back (calibTiming.deltaMs);
+      }
+    }
   }
 }
 
@@ -370,6 +398,220 @@ void MidiGridAnalyzerAudioProcessor::generateTestModeBeat (double blockStartPpq,
         std::abs (std::fmod (tick, static_cast<double> (currentTimeSigNum) * 4.0)) < 0.001)
       emit (DrumMap::Crash1, DrumMap::TestModeVelocity::Crash);
   }
+}
+
+// ── Calibration wizard ──
+void MidiGridAnalyzerAudioProcessor::startCalibration () {
+  const ParamSnapshot p = readSnapshot (apvts);
+  const double gridInterval = getSubdivisionPpq (p.subChoice);
+  if (gridInterval <= 0.0 || p.timeSigNum <= 0 || currentBpm <= 0.0) {
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> lock (calibMutex);
+    calibDeltas.clear ();
+    calibResult = {};
+  }
+  calibBpm = currentBpm;
+  calibGridInterval = gridInterval;
+  calibTimeSigNum = p.timeSigNum;
+  // Grid-synced: start at next bar line (beat 1), so count-in is exactly 1 bar
+  // e.g., if now at 2.3 and 4/4, next bar is 4.0, count 4..1, then rec at 8.0
+  const double nextBar =
+      std::ceil (currentPpqPosition / static_cast<double> (calibTimeSigNum)) * static_cast<double> (calibTimeSigNum);
+  // If already exactly on bar line, start now (no extra gap)
+  calibStartPpq = (std::abs (currentPpqPosition - nextBar) < 1e-9) ? currentPpqPosition : nextBar;
+  // Count-in: 1 bar of quarters (timeSigNum beats), Recording: 4 bars of subdivisions
+  calibCountInEndPpq = calibStartPpq + static_cast<double> (calibTimeSigNum);
+  calibRecStartPpq = calibCountInEndPpq;
+  calibRecEndPpq = calibRecStartPpq + 4.0 * static_cast<double> (calibTimeSigNum);
+  const double totalPpq = 4.0 * static_cast<double> (calibTimeSigNum);
+  calibExpectedHits = static_cast<int> (std::round (totalPpq / calibGridInterval));
+  calibState.store (static_cast<int> (CalibState::CountIn));
+  calibNeedsBroadcast.store (true);
+}
+
+void MidiGridAnalyzerAudioProcessor::cancelCalibration () {
+  calibState.store (static_cast<int> (CalibState::Idle));
+  {
+    std::lock_guard<std::mutex> lock (calibMutex);
+    calibDeltas.clear ();
+    calibResult = {};
+  }
+  calibNeedsBroadcast.store (true);
+}
+
+void MidiGridAnalyzerAudioProcessor::applyCalibrationResult (bool addToExisting) {
+  CalibResult r;
+  {
+    std::lock_guard<std::mutex> lock (calibMutex);
+    r = calibResult;
+  }
+  if (!r.hasResult || r.hitCount == 0) {
+    return;
+  }
+  const float currentUser = apvts.getRawParameterValue ("latency_offset_ms")->load ();
+  const float newVal = addToExisting ? currentUser + static_cast<float> (r.meanMs) : static_cast<float> (r.meanMs);
+  const float clamped = std::clamp (newVal, constants::params::latencyMin, constants::params::latencyMax);
+  if (auto *param = apvts.getParameter ("latency_offset_ms")) {
+    param->setValueNotifyingHost (param->convertTo0to1 (clamped));
+  }
+  // Reset to idle after apply (keep result for display until next start)
+  calibState.store (static_cast<int> (CalibState::Idle));
+  calibNeedsBroadcast.store (true);
+}
+
+MidiGridAnalyzerAudioProcessor::CalibResult MidiGridAnalyzerAudioProcessor::getCalibrationResult () const {
+  std::lock_guard<std::mutex> lock (const_cast<std::mutex &> (calibMutex));
+  return calibResult;
+}
+
+int MidiGridAnalyzerAudioProcessor::getCalibrationBeatsRemaining () const noexcept {
+  const auto st = static_cast<CalibState> (calibState.load ());
+  if (st == CalibState::CountIn) {
+    const double remaining = calibCountInEndPpq - currentPpqPosition;
+    return std::max (0, static_cast<int> (std::ceil (remaining)));
+  }
+  if (st == CalibState::Recording) {
+    const double remaining = calibRecEndPpq - currentPpqPosition;
+    return std::max (0, static_cast<int> (std::ceil (remaining)));
+  }
+  return 0;
+}
+
+double MidiGridAnalyzerAudioProcessor::getCalibrationProgress () const noexcept {
+  const auto st = static_cast<CalibState> (calibState.load ());
+  if (st == CalibState::CountIn) {
+    const double total = calibCountInEndPpq - calibStartPpq;
+    const double done = currentPpqPosition - calibStartPpq;
+    return total > 0.0 ? std::clamp (done / total, 0.0, 1.0) : 0.0;
+  }
+  if (st == CalibState::Recording) {
+    const double total = calibRecEndPpq - calibRecStartPpq;
+    const double done = currentPpqPosition - calibRecStartPpq;
+    return total > 0.0 ? std::clamp (done / total, 0.0, 1.0) : 0.0;
+  }
+  if (st == CalibState::Done) {
+    return 1.0;
+  }
+  return 0.0;
+}
+
+void MidiGridAnalyzerAudioProcessor::updateCalibrationState (double blockStartPpq, double blockEndPpq) {
+  const auto st = static_cast<CalibState> (calibState.load ());
+  if (st == CalibState::CountIn) {
+    if (blockEndPpq >= calibCountInEndPpq) {
+      calibState.store (static_cast<int> (CalibState::Recording));
+      calibNeedsBroadcast.store (true);
+    }
+  } else if (st == CalibState::Recording) {
+    if (blockEndPpq >= calibRecEndPpq) {
+      finalizeCalibration ();
+    }
+  }
+  juce::ignoreUnused (blockStartPpq);
+}
+
+void MidiGridAnalyzerAudioProcessor::finalizeCalibration () {
+  std::vector<double> deltas;
+  {
+    std::lock_guard<std::mutex> lock (calibMutex);
+    deltas = calibDeltas;
+  }
+  CalibResult r;
+  r.expectedHits = calibExpectedHits;
+  r.hitCount = static_cast<int> (deltas.size ());
+  r.hasResult = (r.hitCount > 0);
+  if (r.hitCount > 0) {
+    double sum = 0.0;
+    for (double d : deltas) {
+      sum += d;
+    }
+    r.meanMs = sum / deltas.size ();
+    // Median
+    std::vector<double> sorted = deltas;
+    std::sort (sorted.begin (), sorted.end ());
+    if (sorted.size () % 2 == 1) {
+      r.medianMs = sorted[sorted.size () / 2];
+    } else {
+      r.medianMs = (sorted[sorted.size () / 2 - 1] + sorted[sorted.size () / 2]) * 0.5;
+    }
+    // SD (outlier trim: ignore >2*SD in mean? keep simple SD)
+    double var = 0.0;
+    for (double d : deltas) {
+      var += (d - r.meanMs) * (d - r.meanMs);
+    }
+    r.sdMs = std::sqrt (var / deltas.size ());
+    // Trim outliers >2*SD for final mean (robust)
+    if (r.sdMs > 0.0 && deltas.size () >= 4) {
+      double trimmedSum = 0.0;
+      int trimmedCount = 0;
+      for (double d : deltas) {
+        if (std::abs (d - r.meanMs) <= 2.0 * r.sdMs) {
+          trimmedSum += d;
+          ++trimmedCount;
+        }
+      }
+      if (trimmedCount >= 2) {
+        r.meanMs = trimmedSum / trimmedCount;
+      }
+    }
+    // Corner cases: keep old latency
+    // 0 hits already hasResult false above
+    // High jitter (SD > 20ms) or <50% hits -> indecisive
+    if (r.hasResult) {
+      const bool tooFew = r.hitCount < (r.expectedHits * 0.5);
+      const bool jitterHigh = r.sdMs > 20.0;
+      if (tooFew || jitterHigh) {
+        r.hasResult = false;
+      }
+    }
+    // Clamp negative (rush) to 0 — latency cannot be negative
+    if (r.hasResult && r.meanMs < 0.0) {
+      r.meanMs = 0.0;
+      r.medianMs = std::max (0.0, r.medianMs);
+    }
+  }
+  {
+    std::lock_guard<std::mutex> lock (calibMutex);
+    calibResult = r;
+  }
+  calibState.store (static_cast<int> (CalibState::Done));
+  calibNeedsBroadcast.store (true);
+}
+
+juce::String MidiGridAnalyzerAudioProcessor::getCalibrationStateJson () const {
+  if (!calibNeedsBroadcast.load ()) {
+    return {};
+  }
+  // Only broadcast once per state change; caller will clear after send
+  const_cast<std::atomic<bool> &> (calibNeedsBroadcast).store (false);
+  const auto st = static_cast<CalibState> (calibState.load ());
+  const char *stateStr = "idle";
+  if (st == CalibState::CountIn) {
+    stateStr = "countin";
+  } else if (st == CalibState::Recording) {
+    stateStr = "recording";
+  } else if (st == CalibState::Done) {
+    stateStr = "done";
+  }
+  auto obj = juce::DynamicObject::Ptr (new juce::DynamicObject ());
+  obj->setProperty ("type", "calibration");
+  obj->setProperty ("state", stateStr);
+  obj->setProperty ("progress", getCalibrationProgress ());
+  obj->setProperty ("beatsRemaining", getCalibrationBeatsRemaining ());
+  CalibResult r = getCalibrationResult ();
+  obj->setProperty ("meanMs", r.meanMs);
+  obj->setProperty ("medianMs", r.medianMs);
+  obj->setProperty ("sdMs", r.sdMs);
+  obj->setProperty ("hitCount", r.hitCount);
+  obj->setProperty ("expectedHits", r.expectedHits);
+  obj->setProperty ("hasResult", r.hasResult);
+  // Include grid context for UI
+  obj->setProperty ("bpm", calibBpm);
+  obj->setProperty ("gridInterval", calibGridInterval);
+  obj->setProperty ("timeSigNum", calibTimeSigNum);
+  return juce::JSON::toString (obj.get ());
 }
 
 juce::AudioProcessorEditor *MidiGridAnalyzerAudioProcessor::createEditor () {

@@ -1,3 +1,4 @@
+// ignore_for_file: unused_element_parameter
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -246,7 +247,7 @@ class _ControlScreenState extends State<ControlScreen>
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -258,7 +259,7 @@ class _ControlScreenState extends State<ControlScreen>
                         '${currentBpm.round()}',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 64,
+                          fontSize: 52,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -1.0,
                         ),
@@ -289,13 +290,13 @@ class _ControlScreenState extends State<ControlScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                   SignaturePicker(
                     currentNumerator: (timeSig?.value ?? 4.0).round(),
                     onChanged: (n) =>
                         connection.setParameter('time_sig_num', n.toDouble()),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                   SubdivisionPicker(
                     currentIndex: (clickSub?.value ?? 1.0).round(),
                     onChanged: (i) => connection.setParameter(
@@ -303,16 +304,23 @@ class _ControlScreenState extends State<ControlScreen>
                       i.toDouble(),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                   _buildHistoryBarsControl(
                     connection,
                     connection.parameters['bars_window'],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                   _buildToleranceControl(
                     connection,
                     connection.parameters['tolerance_ms'],
                   ),
+                  const SizedBox(height: 8),
+                  _buildLatencyControl(
+                    connection,
+                    connection.parameters['latency_offset_ms'],
+                  ),
+                  const SizedBox(height: 8),
+                  _buildCalibrateControl(connection),
                 ],
               ),
             ),
@@ -741,6 +749,266 @@ class _ControlScreenState extends State<ControlScreen>
     );
   }
 
+  Widget _buildLatencyControl(
+    ConnectionService connection,
+    RemoteParameter? latency,
+  ) {
+    final val = (latency?.value ?? 0.0).toDouble();
+    final minVal = (latency?.min ?? -500.0).toDouble();
+    final maxVal = (latency?.max ?? 500.0).toDouble();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 340,
+          child: Row(
+            children: [
+              const Text(
+                'SYSTEM LATENCY',
+                style: TextStyle(
+                  color: Color(0xFF8b92a8),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2.5,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${val.toStringAsFixed(0)} ms',
+                style: const TextStyle(
+                  color: Color(0xFF38bdf8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: 340,
+          child: SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: const Color(0xFF38bdf8),
+              inactiveTrackColor: Colors.black.withValues(alpha: 0.4),
+              thumbColor: const Color(0xFF38bdf8),
+              overlayColor: const Color(0xFF38bdf8).withValues(alpha: 0.2),
+              trackHeight: 4,
+              thumbShape: const RoundSliderThumbShape(
+                enabledThumbRadius: 10,
+                elevation: 4,
+              ),
+            ),
+            child: Slider(
+              value: val.clamp(minVal, maxVal),
+              min: minVal,
+              max: maxVal,
+              divisions: 1000,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                connection.updateLocalParameterValue('latency_offset_ms', v.roundToDouble());
+              },
+              onChangeEnd: (v) {
+                connection.setParameter('latency_offset_ms', v.roundToDouble());
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCalibrateControl(ConnectionService connection) {
+    final state = connection.calibrationState;
+    final progress = connection.calibrationProgress;
+    final isIdle = state == 'idle';
+    final isCountIn = state == 'countin';
+    final isRecording = state == 'recording';
+    final isDone = state == 'done';
+    String label;
+    Color bg;
+    Color border;
+    String subtitle = '';
+    if (isIdle) {
+      label = 'CALIBRATE LATENCY';
+      bg = const Color(0xFF38bdf8).withValues(alpha: 0.15);
+      border = const Color(0xFF38bdf8).withValues(alpha: 0.5);
+    } else if (isCountIn) {
+      label = 'COUNT-IN...';
+      bg = const Color(0xFFFACC15).withValues(alpha: 0.2);
+      border = const Color(0xFFFACC15).withValues(alpha: 0.6);
+      subtitle = 'Get ready — ${connection.calibrationTimeSigNum}/4 @ ${connection.calibrationBpm.toStringAsFixed(0)} BPM — hits every subdiv';
+    } else if (isRecording) {
+      final pct = (progress * 100).round();
+      label = 'REC $pct%';
+      bg = const Color(0xFFFB923C).withValues(alpha: 0.2);
+      border = const Color(0xFFFB923C).withValues(alpha: 0.6);
+      subtitle = '${connection.calibrationHitCount}/${connection.calibrationExpectedHits} hits';
+    } else if (isDone) {
+      final hasRes = connection.calibrationHasResult && connection.calibrationHitCount > 0;
+      if (!hasRes) {
+        label = 'NO HITS — KEEP OLD';
+        bg = const Color(0xFF6b7280).withValues(alpha: 0.15);
+        border = const Color(0xFF6b7280).withValues(alpha: 0.5);
+        subtitle = 'Hit every subdiv @ ${connection.calibrationBpm.toStringAsFixed(0)} BPM — try again';
+      } else {
+        final clamped = connection.calibrationMeanMs.clamp(0.0, 500.0);
+        label = 'APPLY ${clamped.toStringAsFixed(1)}ms?';
+        bg = const Color(0xFF00FF88).withValues(alpha: 0.2);
+        border = const Color(0xFF00FF88).withValues(alpha: 0.6);
+        subtitle =
+            'Median ${connection.calibrationMedianMs.clamp(0.0, 500.0).toStringAsFixed(1)} SD ${connection.calibrationSdMs.toStringAsFixed(1)}'
+            '${connection.calibrationMeanMs < 0 ? ' (rush, clamped to 0)' : ''}';
+      }
+    } else {
+      label = state.toUpperCase();
+      bg = const Color(0xFF2d3245).withValues(alpha: 0.3);
+      border = const Color(0xFF2d3245);
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            if (isIdle) {
+              connection.startCalibration();
+            } else if (isCountIn || isRecording) {
+              connection.cancelCalibration();
+            } else if (isDone) {
+              _showCalibrationDoneDialog(connection);
+            }
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 340,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: border, width: 1.5),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: border,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+              ),
+            ),
+          ),
+        ),
+        if (subtitle.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: Color(0xFF8b92a8),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+        if (isDone) ...[
+          const SizedBox(height: 8),
+          Builder(builder: (context) {
+            final hasRes = connection.calibrationHasResult && connection.calibrationHitCount > 0;
+            if (!hasRes) {
+              return TextButton(
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  connection.cancelCalibration();
+                },
+                child: const Text('OK — Keep old latency', style: TextStyle(color: Colors.white70)),
+              );
+            }
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF88),
+                    foregroundColor: const Color(0xFF0a0c10),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    connection.applyCalibration(addToExisting: false);
+                  },
+                  child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF00FF88),
+                    side: BorderSide(color: const Color(0xFF00FF88).withValues(alpha: 0.5)),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  ),
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    connection.applyCalibration(addToExisting: true);
+                  },
+                  child: const Text('Add'),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    connection.cancelCalibration();
+                  },
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+                ),
+              ],
+            );
+          }),
+        ],
+      ],
+    );
+  }
+
+  void _showCalibrationDoneDialog(ConnectionService connection) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF141722),
+        title: const Text('Calibration Done', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        content: Text(
+          'Mean ${connection.calibrationMeanMs.toStringAsFixed(1)}ms '
+          '(median ${connection.calibrationMedianMs.toStringAsFixed(1)} SD ${connection.calibrationSdMs.toStringAsFixed(1)})\n'
+          'Hits ${connection.calibrationHitCount}/${connection.calibrationExpectedHits} on subdiv grid.',
+          style: const TextStyle(color: Color(0xFF8b92a8), fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              connection.cancelCalibration();
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              connection.applyCalibration(addToExisting: true);
+            },
+            child: const Text('Add to existing'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF88)),
+            onPressed: () {
+              Navigator.pop(context);
+              connection.applyCalibration(addToExisting: false);
+            },
+            child: const Text('Apply', style: TextStyle(color: Color(0xFF0a0c10))),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFooterActions(
     ConnectionService connection,
     PracticeTimerService timerService,
@@ -963,11 +1231,6 @@ class _ControlScreenState extends State<ControlScreen>
               _SecondaryDef('click_pan', 'Click Panning'),
               _SecondaryDef('click_sample_preset', 'Click Sound Preset'),
               _SecondaryDef('subdivision', 'Grid Subdivision'),
-              _SecondaryDef(
-                'latency_offset_ms',
-                'System Latency',
-                suffix: ' ms',
-              ),
               _SecondaryDef('min_velocity', 'Min Velocity'),
               _SecondaryDef('show_ms_labels', 'Display MS Offsets'),
               _SecondaryDef('note_filter', 'Display Mode'),

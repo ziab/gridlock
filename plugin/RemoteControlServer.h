@@ -20,6 +20,8 @@
  *             On connect   → sends full parameter state snapshot (JSON).
  *             On receive   → {"type":"set","id":"<paramId>","value":<float>}
  *             On param Δ   → pushes {"type":"changed","id":"<paramId>","value":<float>}
+ *             Calibration  → {"type":"calibrate"} / {"type":"calibration_apply","add":bool} /
+ * {"type":"calibration_cancel"} Calibration  ← pushes {"type":"calibration","state":"idle|countin|recording|done",...}
  *             Heartbeat    → pushes {"type":"ping"} every 2 s.
  */
 class RemoteControlServer : private juce::Thread, private juce::Timer {
@@ -30,6 +32,10 @@ public:
 
   void start ();
   void stop ();
+
+  // Calibration bridge (set by PluginProcessor to avoid circular include)
+  void setCalibrationCallbacks (std::function<void ()> onCalibrate, std::function<void (bool)> onApply,
+                                std::function<void ()> onCancel, std::function<juce::String ()> getCalibJson);
 
 private:
   // ── Thread (WebSocket accept loop) ──────────────────────────────
@@ -65,6 +71,12 @@ private:
 
   // Snapshot of last-sent parameter values for change detection
   std::map<juce::String, float> lastParamValues;
+
+  // Calibration callbacks
+  std::function<void ()> onCalibrate;
+  std::function<void (bool)> onCalibrationApply;
+  std::function<void ()> onCalibrationCancel;
+  std::function<juce::String ()> getCalibrationJson;
 
   // UDP discovery runs on its own thread
   std::unique_ptr<juce::Thread> discoveryThread;

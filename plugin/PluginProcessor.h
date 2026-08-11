@@ -114,10 +114,32 @@ public:
   }
   double getDeviceLatencyMs (double sampleRate) const noexcept;
 
+  // ── Calibration wizard ──
+  enum class CalibState : int { Idle = 0, CountIn = 1, Recording = 2, Done = 3 };
+  struct CalibResult {
+    double meanMs{0.0};
+    double medianMs{0.0};
+    double sdMs{0.0};
+    int hitCount{0};
+    int expectedHits{0};
+    bool hasResult{false};
+  };
+  void startCalibration ();
+  void cancelCalibration ();
+  void applyCalibrationResult (bool addToExisting = false);
+  CalibState getCalibrationState () const noexcept {
+    return static_cast<CalibState> (calibState.load ());
+  }
+  CalibResult getCalibrationResult () const;
+  // For UI polling: remaining beats in current phase + progress 0..1
+  int getCalibrationBeatsRemaining () const noexcept;
+  double getCalibrationProgress () const noexcept;
+  juce::String getCalibrationStateJson () const;
+
 private:
   void updateHostSyncAndPlayhead (float internalBpmVal, int timeSigNumVal, bool isPausedVal);
   void processIncomingMidi (const juce::MidiBuffer &midiMessages, double srToUse, double gridInterval,
-                            float toleranceMs, int minVelocity, double totalLatencyPpq);
+                            float toleranceMs, int minVelocity, double totalLatencyPpq, double calibLatencyPpq);
   // Hi-hat ghost suppression: records edge/closed hits and filters spurious open-tip retriggers.
   // Returns true if the note should be filtered (dropped).
   bool updateHiHatHistoryAndShouldFilter (uint8_t noteNum, uint8_t velocity, double nowMs);
@@ -143,6 +165,24 @@ private:
 
   std::atomic<int> deviceOutputLatencySamples{0};
   std::atomic<int> deviceInputLatencySamples{0};
+
+  // Calibration state (audio thread writes, UI thread reads)
+  std::atomic<int> calibState{0}; // CalibState
+  double calibStartPpq{0.0};
+  double calibCountInEndPpq{0.0};
+  double calibRecStartPpq{0.0};
+  double calibRecEndPpq{0.0};
+  double calibBpm{120.0};
+  double calibGridInterval{0.25};
+  int calibTimeSigNum{4};
+  int calibExpectedHits{0};
+  std::vector<double> calibDeltas;
+  std::mutex calibMutex;
+  CalibResult calibResult;
+  std::atomic<bool> calibNeedsBroadcast{false};
+
+  void updateCalibrationState (double blockStartPpq, double blockEndPpq);
+  void finalizeCalibration ();
 
   double lastTestBeatTick{-1.0};
   double lastOtherHiHatTimeMs{-100000.0};

@@ -104,6 +104,37 @@ class ConnectionService extends ChangeNotifier {
     _channel!.sink.add(jsonEncode({'type': 'clear_grid'}));
   }
 
+  /// Calibration controls (init'able from companion)
+  void startCalibration() {
+    if (!_connected || _channel == null) return;
+    _channel!.sink.add(jsonEncode({'type': 'calibrate'}));
+  }
+
+  void applyCalibration({bool addToExisting = false}) {
+    if (!_connected || _channel == null) return;
+    _channel!.sink.add(jsonEncode({'type': 'calibration_apply', 'add': addToExisting}));
+  }
+
+  void cancelCalibration() {
+    if (!_connected || _channel == null) return;
+    _channel!.sink.add(jsonEncode({'type': 'calibration_cancel'}));
+  }
+
+  /// Last calibration state received from server
+  String calibrationState = 'idle'; // idle|countin|recording|done
+  double calibrationProgress = 0.0;
+  int calibrationBeatsRemaining = 0;
+  double calibrationMeanMs = 0.0;
+  double calibrationMedianMs = 0.0;
+  double calibrationSdMs = 0.0;
+  int calibrationHitCount = 0;
+  int calibrationExpectedHits = 0;
+  bool calibrationHasResult = false;
+  double calibrationBpm = 120.0;
+  int calibrationTimeSigNum = 4;
+  String calibrationGridInterval = '';
+  Timer? _calibrationAutoResetTimer;
+
   /// Request a full state refresh.
   void requestFullState() {
     if (!_connected || _channel == null) return;
@@ -121,6 +152,9 @@ class ConnectionService extends ChangeNotifier {
           break;
         case 'changed':
           _handleParamChanged(json);
+          break;
+        case 'calibration':
+          _handleCalibration(json);
           break;
         case 'ping':
           // Heartbeat — no action needed
@@ -155,6 +189,33 @@ class ConnectionService extends ChangeNotifier {
       if (norm != null) parameters[id]!.norm = norm;
       notifyListeners();
     }
+  }
+
+  void _handleCalibration(Map<String, dynamic> json) {
+    final prev = calibrationState;
+    calibrationState = (json['state'] as String?) ?? 'idle';
+    calibrationProgress = (json['progress'] as num?)?.toDouble() ?? 0.0;
+    calibrationBeatsRemaining = (json['beatsRemaining'] as num?)?.toInt() ?? 0;
+    calibrationMeanMs = (json['meanMs'] as num?)?.toDouble() ?? 0.0;
+    calibrationMedianMs = (json['medianMs'] as num?)?.toDouble() ?? 0.0;
+    calibrationSdMs = (json['sdMs'] as num?)?.toDouble() ?? 0.0;
+    calibrationHitCount = (json['hitCount'] as num?)?.toInt() ?? 0;
+    calibrationExpectedHits = (json['expectedHits'] as num?)?.toInt() ?? 0;
+    calibrationHasResult = (json['hasResult'] as bool?) ?? false;
+    calibrationBpm = (json['bpm'] as num?)?.toDouble() ?? 120.0;
+    calibrationTimeSigNum = (json['timeSigNum'] as num?)?.toInt() ?? 4;
+    // Auto-reset DONE -> idle after 3s so button becomes active again (throne-friendly)
+    _calibrationAutoResetTimer?.cancel();
+    if (calibrationState == 'done' && prev != 'done') {
+      _calibrationAutoResetTimer = Timer(const Duration(seconds: 3), () {
+        if (calibrationState == 'done') {
+          cancelCalibration();
+        }
+      });
+    } else if (calibrationState == 'idle') {
+      _calibrationAutoResetTimer?.cancel();
+    }
+    notifyListeners();
   }
 
   void _handleDisconnect() {
