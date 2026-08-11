@@ -399,6 +399,93 @@ public:
 };
 static AsciiTabRendererTest asciiTabRendererTest;
 
+// ── DeviceLatency ──
+class DeviceLatencyTest : public juce::UnitTest {
+public:
+  DeviceLatencyTest () : UnitTest ("DeviceLatency", "P1") {}
+  void runTest () override {
+    beginTest ("ms conversion");
+    {
+      MidiGridAnalyzerAudioProcessor p;
+      p.setDeviceLatencySamples (441, 0);
+      expectWithinAbsoluteError (p.getDeviceLatencyMs (44100.0), 10.0, 1e-9);
+      p.setDeviceLatencySamples (1024, 0);
+      expectWithinAbsoluteError (p.getDeviceLatencyMs (44100.0), 1024.0 / 44100.0 * 1000.0, 1e-9);
+      p.setDeviceLatencySamples (0, 0);
+      expectWithinAbsoluteError (p.getDeviceLatencyMs (44100.0), 0.0, 1e-9);
+      expectWithinAbsoluteError (p.getDeviceLatencyMs (0.0), 0.0, 1e-9);
+      expectEquals (p.getDeviceOutputLatencySamples (), 0);
+    }
+    beginTest ("prepareToPlay heuristic");
+    {
+      MidiGridAnalyzerAudioProcessor p;
+      p.prepareToPlay (44100.0, 512);
+      if (p.isStandaloneAppMode ()) {
+        expectEquals (p.getDeviceOutputLatencySamples (), 512);
+        expectWithinAbsoluteError (p.getDeviceLatencyMs (44100.0), 512.0 / 44100.0 * 1000.0, 1e-6);
+      } else {
+        expectEquals (p.getDeviceOutputLatencySamples (), 0);
+      }
+    }
+    beginTest ("total latency ppq shifts timing");
+    {
+      const double bpm = 120.0;
+      const double deviceMs = 1024.0 / 44100.0 * 1000.0; // ~23.22
+      const double totPpq = (deviceMs / 1000.0) * (bpm / 60.0);
+      HitEvent e{};
+      e.rawHitPpqPosition = 5.0;
+      auto t0 = Timing::compute (e.rawHitPpqPosition, 0.25, bpm, 20.0f);
+      expectWithinAbsoluteError (t0.deltaMs, 0.0, 1e-9);
+      auto t1 = Timing::compute (e.rawHitPpqPosition - totPpq, 0.25, bpm, 20.0f);
+      expectWithinAbsoluteError (t1.deltaMs, -deviceMs, 0.6);
+      expect (t1.state == TimingState::Rush);
+    }
+    beginTest ("GridViewState deviceLatencyMs propagates to AsciiTab");
+    {
+      auto makeView = [] (float devMs) {
+        GridViewState v;
+        v.numBars = 1;
+        v.gridSubdivisionPpq = 0.25;
+        v.bpm = 120.0f;
+        v.timeSigNum = 4;
+        v.toleranceMs = 20.0f;
+        v.currentPpq = 4.0;
+        v.latencyOffsetMs = 0.0f;
+        v.deviceLatencyMs = devMs;
+        return v;
+      };
+      auto makeHit = [] (double ppq) {
+        HitEvent h{};
+        h.noteNumber = DrumMap::Kick;
+        h.rawHitPpqPosition = ppq;
+        h.hitPpqPosition = ppq;
+        return h;
+      };
+      GridViewState v0 = makeView (0.0f);
+      GridViewState v1 = makeView (23.22f);
+      std::vector<HitEvent> ev = {makeHit (0.06)}; // 30ms drag at 120bpm
+      auto r0 = AsciiTab::render (ev, v0);
+      auto r1 = AsciiTab::render (ev, v1);
+      expect (r0.text != r1.text);
+      // v1 shifts hit earlier by 23ms -> 7ms drag stays OnGrid (+), v0 is Drag (>)
+      expect (r0.text.find (">") != std::string::npos);
+      expect (r1.text.find ("+") != std::string::npos || r1.text.find (">") == std::string::npos);
+    }
+    beginTest ("buffer size drift regression +/-30ms");
+    {
+      const double bpm = 120.0;
+      for (int bs : {128, 512, 1024, 2048}) {
+        const double devMs = bs / 44100.0 * 1000.0;
+        const double totPpq = (devMs / 1000.0) * (bpm / 60.0);
+        // same raw hit at 2.0 (on grid) appears rush by devMs when compensated
+        auto t = Timing::compute (2.0 - totPpq, 0.25, bpm, 20.0f);
+        expectWithinAbsoluteError (std::abs (t.deltaMs), devMs, 0.6);
+      }
+    }
+  }
+};
+static DeviceLatencyTest deviceLatencyTest;
+
 // ── runner ──
 int main () {
   juce::ScopedJuceInitialiser_GUI juceInit;

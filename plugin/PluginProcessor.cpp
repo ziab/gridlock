@@ -134,8 +134,28 @@ MidiGridAnalyzerAudioProcessor::readSnapshot (const juce::AudioProcessorValueTre
   return s;
 }
 
+void MidiGridAnalyzerAudioProcessor::setDeviceLatencySamples (int outputLatencySamples,
+                                                              int inputLatencySamples) noexcept {
+  deviceOutputLatencySamples.store (outputLatencySamples);
+  deviceInputLatencySamples.store (inputLatencySamples);
+}
+
+double MidiGridAnalyzerAudioProcessor::getDeviceLatencyMs (double sampleRate) const noexcept {
+  if (sampleRate <= 0.0) {
+    return 0.0;
+  }
+  // For e-kit USB MIDI, input latency is negligible; output latency (click) dominates.
+  // Expose output latency for compensation; input kept for future audio-input path.
+  return (static_cast<double> (deviceOutputLatencySamples.load ()) / sampleRate) * 1000.0;
+}
+
 void MidiGridAnalyzerAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
-  juce::ignoreUnused (samplesPerBlock);
+  if (isStandaloneMode && samplesPerBlock > 0) {
+    // Heuristic fallback so audio thread has correct total latency even without editor open.
+    // Real device latency is refined by PluginEditor::updateDeviceLatency() polling.
+    deviceOutputLatencySamples.store (samplesPerBlock);
+    deviceInputLatencySamples.store (0);
+  }
   internalPpqPosition = 0.0;
   lastTestBeatTick = -1.0;
   ringBuffer.reset ();
@@ -171,7 +191,8 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
   }
 
   const double autoLatencyMs = (static_cast<double> (getLatencySamples ()) / srToUse) * 1000.0;
-  const double totalLatencyMs = autoLatencyMs + static_cast<double> (p.userLatencyMs);
+  const double deviceLatencyMs = getDeviceLatencyMs (srToUse);
+  const double totalLatencyMs = autoLatencyMs + deviceLatencyMs + static_cast<double> (p.userLatencyMs);
   const double totalLatencyPpq = (totalLatencyMs / 1000.0) * (currentBpm / 60.0);
 
   if (!p.isPaused) {

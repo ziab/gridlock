@@ -93,6 +93,7 @@ void GridComponent::updateEvents (const std::vector<HitEvent> &events, double cu
   s.showNoteNumbers = showNoteNumbers;
   s.toleranceMs = toleranceMs;
   s.latencyOffsetMs = latencyOffsetMs;
+  s.deviceLatencyMs = 0.0f;
   s.bpm = bpm;
   update (s, events);
 }
@@ -261,12 +262,12 @@ void GridComponent::drawHitSymbol (juce::Graphics &g, float cx, float cy, float 
 }
 
 std::pair<int, int> GridComponent::drawHits (juce::Graphics &g, const Layout &l, double minPpq, double maxPpq,
-                                             double totalPpqWindow, double userLatencyPpq, float maxErrorMs) const {
+                                             double totalPpqWindow, double totalLatencyPpq, float maxErrorMs) const {
   int total = 0, green = 0;
 
   for (const auto &event : activeEvents) {
     const double rawPpq = (event.rawHitPpqPosition > 0.0) ? event.rawHitPpqPosition : event.hitPpqPosition;
-    const double compPpq = rawPpq - userLatencyPpq;
+    const double compPpq = rawPpq - totalLatencyPpq;
     if (compPpq < minPpq || compPpq > maxPpq) {
       continue;
     }
@@ -395,10 +396,11 @@ void GridComponent::paint (juce::Graphics &g) {
 
   drawGridLines (g, l, minPpq, maxPpq, totalPpqWindow);
 
-  const double userLatencyPpq = (static_cast<double> (view.latencyOffsetMs) / 1000.0) * (view.bpm / 60.0);
+  const double totalLatencyPpq =
+      (static_cast<double> (view.latencyOffsetMs + view.deviceLatencyMs) / 1000.0) * (view.bpm / 60.0);
   const float maxErrorMs = static_cast<float> ((view.gridSubdivisionPpq / 2.0) * (60.0 / view.bpm) * 1000.0);
 
-  const auto [totalHits, greenHits] = drawHits (g, l, minPpq, maxPpq, totalPpqWindow, userLatencyPpq, maxErrorMs);
+  const auto [totalHits, greenHits] = drawHits (g, l, minPpq, maxPpq, totalPpqWindow, totalLatencyPpq, maxErrorMs);
 
   drawPlayhead (g, l);
   drawFooter (g, l, totalHits, greenHits);

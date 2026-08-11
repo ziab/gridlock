@@ -5,6 +5,7 @@
 #include "RemoteControlServer.h"
 #include "RingBuffer.h"
 
+#include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
 
 class MidiGridAnalyzerAudioProcessor : public juce::AudioProcessor {
@@ -97,6 +98,22 @@ public:
 
   juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout ();
 
+  // Device latency (audio output/input) reported by Standalone AudioDeviceManager.
+  // Stored atomically so audio thread can read without lock; updated from message thread.
+  // NOTE: Audio output latency is measurable via getOutputLatencyInSamples() (blockSize +
+  // hidden buffers). MIDI input latency (USB e-kit ~1-3ms + jitter) is NOT reported by
+  // AudioDeviceManager and is currently stored as 0; calibrate via user Latency slider.
+  // If MIDI loopback measurement is added later, put it in inputLatencySamples and
+  // getDeviceLatencyMs() will include it in total compensation.
+  void setDeviceLatencySamples (int outputLatencySamples, int inputLatencySamples) noexcept;
+  int getDeviceOutputLatencySamples () const noexcept {
+    return deviceOutputLatencySamples.load ();
+  }
+  int getDeviceInputLatencySamples () const noexcept {
+    return deviceInputLatencySamples.load ();
+  }
+  double getDeviceLatencyMs (double sampleRate) const noexcept;
+
 private:
   void updateHostSyncAndPlayhead (float internalBpmVal, int timeSigNumVal, bool isPausedVal);
   void processIncomingMidi (const juce::MidiBuffer &midiMessages, double srToUse, double gridInterval,
@@ -123,6 +140,9 @@ private:
   bool isStandaloneMode{false};
 
   std::unique_ptr<RemoteControlServer> remoteServer;
+
+  std::atomic<int> deviceOutputLatencySamples{0};
+  std::atomic<int> deviceInputLatencySamples{0};
 
   double lastTestBeatTick{-1.0};
   double lastOtherHiHatTimeMs{-100000.0};

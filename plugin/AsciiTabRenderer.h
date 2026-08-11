@@ -443,7 +443,8 @@ inline RenderResult render (const std::vector<HitEvent> &events, const GridViewS
     return res;
   }
 
-  const double latencyPpq = (static_cast<double> (view.latencyOffsetMs) / 1000.0) * (view.bpm / 60.0);
+  const double latencyPpq =
+      (static_cast<double> (view.latencyOffsetMs + view.deviceLatencyMs) / 1000.0) * (view.bpm / 60.0);
   const double totalPpqWindow = static_cast<double> (view.numBars) * view.timeSigNum;
   const double maxPpq = view.currentPpq;
   const double minPpq = maxPpq - totalPpqWindow;

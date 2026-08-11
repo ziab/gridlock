@@ -26,6 +26,7 @@ private:
   void drainRingBuffer ();
   void evictOldEvents (double currentPpq, int barsVal);
   GridViewState buildGridViewState (int barsVal) const;
+  void updateDeviceLatency ();
 
   static int indexForTimeSig (int num) noexcept;
   static int timeSigForIndex (int idx) noexcept;
@@ -65,6 +66,7 @@ private:
   juce::Label subdivisionLabel{{}, "Subdiv:"};
   juce::Label toleranceLabel{{}, "Tolerance:"};
   juce::Label latencyLabel{{}, "Latency:"};
+  juce::Label deviceLatencyLabel{{}, "Dev:"};
   juce::Label velocityLabel{{}, "Min Vel:"};
   juce::Label bpmLabel{{}, "BPM:"};
   juce::Label timeSigLabel{{}, "Time Sig:"};

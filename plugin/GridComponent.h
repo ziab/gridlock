@@ -17,6 +17,7 @@ struct GridViewState {
   bool showNoteNumbers{false};
   float toleranceMs{constants::params::toleranceDefault};
   float latencyOffsetMs{constants::params::latencyDefault};
+  float deviceLatencyMs{0.0f}; // Audio output latency from AudioDeviceManager (Standalone only)
   float bpm{constants::params::bpmDefault};
 };
 
@@ -59,7 +60,7 @@ private:
   void drawGridLines (juce::Graphics &g, const Layout &l, double minPpq, double maxPpq, double totalPpqWindow) const;
   // returns {total, green}
   std::pair<int, int> drawHits (juce::Graphics &g, const Layout &l, double minPpq, double maxPpq, double totalPpqWindow,
-                                double userLatencyPpq, float maxErrorMs) const;
+                                double totalLatencyPpq, float maxErrorMs) const;
   void drawHitSymbol (juce::Graphics &g, float cx, float cy, float radius, float strokeW, double deltaMs,
                       float absDelta, float tolerance, bool showVel, uint8_t velocity) const;
   void drawPlayhead (juce::Graphics &g, const Layout &l) const;

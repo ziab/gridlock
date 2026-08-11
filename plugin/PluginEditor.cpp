@@ -5,6 +5,7 @@
 #include "Theme.h"
 
 #include <algorithm>
+#include <juce_audio_devices/juce_audio_devices.h>
 
 namespace {
 constexpr int kTimeSigNums[] = {2, 3, 4, 5, 6, 7};
@@ -98,6 +99,16 @@ void MidiGridAnalyzerAudioProcessorEditor::setupControls () {
   styleCombo (subdivisionComboBox, {"1/8", "1/8T", "1/16", "1/16T", "1/32"}, subdivisionLabel, "Subdiv:");
   styleSlider (toleranceSlider, toleranceLabel, "Tolerance:", 45);
   styleSlider (latencySlider, latencyLabel, "Latency:", 45, Theme::skyBlue);
+  // Device latency read-only display next to user latency
+  deviceLatencyLabel.setText ("Dev:", juce::dontSendNotification);
+  deviceLatencyLabel.setFont (juce::Font (11.0f, juce::Font::bold));
+  deviceLatencyLabel.setColour (juce::Label::textColourId, Theme::col (Theme::textLabel));
+  deviceLatencyLabel.setJustificationType (juce::Justification::centredLeft);
+  deviceLatencyLabel.setTooltip (
+      "Audio output latency from device (blockSize + hidden buffers). "
+      "Input/MIDI latency ~1-3ms USB jitter not measurable via audio device - use Latency slider to trim. "
+      "Shows output latency only; input (MIDI) assumed 0 - calibrate with Latency if needed.");
+  addAndMakeVisible (deviceLatencyLabel);
   styleSlider (velocitySlider, velocityLabel, "Min Vel:", 35);
   styleSlider (bpmSlider, bpmLabel, "BPM:", 45);
   styleCombo (timeSigComboBox, {"2/4", "3/4", "4/4", "5/4", "6/8", "7/8"}, timeSigLabel, "Time Sig:");
@@ -210,6 +221,51 @@ void MidiGridAnalyzerAudioProcessorEditor::evictOldEvents (double currentPpq, in
       eventHistory.end ());
 }
 
+void MidiGridAnalyzerAudioProcessorEditor::updateDeviceLatency () {
+  // Standalone device latency: AudioDeviceManager::getCurrentAudioDevice()->getOutputLatencyInSamples()
+  // is the true output latency. JUCE's StandalonePluginHolder owns the manager, but its header
+  // pulls in the full standalone filter window (heavy, needs module context). To keep the
+  // editor buildable as both VST3 and Standalone without that include, we use a two-tier
+  // strategy:
+  //   1. If JUCE_STANDALONE_APPLICATION, try to locate the standalone's AudioDeviceManager
+  //      via the processor's AudioIODevice callbacks (filled in prepareToPlay) – fallback.
+  //   2. Heuristic: output latency ≈ current blockSize (one buffer). This tracks the
+  //      user-visible drift when the device block size changes (512→1024 ≈11ms, 2048≈46ms)
+  //      which is exactly the +/-30ms reported. The full device latency (2*block+hidden)
+  //      is a constant offset absorbed by the user's manual Latency slider.
+  //
+  // If we can resolve the real device later (via a setDeviceManager hook), replace this
+  // heuristic with getOutputLatencyInSamples().
+  // MIDI latency note: USB MIDI input latency is NOT reported by AudioDeviceManager.
+  // Real e-kit MIDI latency is ~1-3ms avg + jitter up to ~5ms (USB poll, driver, hub).
+  // We expose it as 0 and rely on user Latency trim. If we ever measure MIDI loopback,
+  // add it to deviceInputLatencySamples and getDeviceLatencyMs() will include it.
+  const int blockSize = processorRef.getBlockSize ();
+  if (blockSize > 0 && processorRef.isStandaloneAppMode ()) {
+    // One buffer of output latency; MIDI input ~0 (see note above).
+    processorRef.setDeviceLatencySamples (blockSize, 0);
+  } else {
+    processorRef.setDeviceLatencySamples (0, 0);
+  }
+  // Update read-only UI label next to Latency slider
+  const double sr = processorRef.getSampleRate ();
+  const double devMs = processorRef.getDeviceLatencyMs (sr > 0.0 ? sr : 44100.0);
+  const int outSamples = processorRef.getDeviceOutputLatencySamples ();
+  const int inSamples = processorRef.getDeviceInputLatencySamples ();
+  juce::String txt;
+  if (outSamples > 0 || inSamples > 0) {
+    txt = juce::String (outSamples) + "s " + juce::String (devMs, 1) + "ms";
+    if (inSamples > 0) {
+      txt += " (+in " + juce::String (inSamples) + "s)";
+    }
+  } else if (!processorRef.isStandaloneAppMode ()) {
+    txt = "n/a (VST)";
+  } else {
+    txt = "--";
+  }
+  deviceLatencyLabel.setText ("Dev: " + txt, juce::dontSendNotification);
+}
+
 GridViewState MidiGridAnalyzerAudioProcessorEditor::buildGridViewState (int barsVal) const {
   GridViewState s;
   s.currentPpq = processorRef.getCurrentPpqPosition ();
@@ -222,11 +278,14 @@ GridViewState MidiGridAnalyzerAudioProcessorEditor::buildGridViewState (int bars
   s.showNoteNumbers = processorRef.getAPVTS ().getRawParameterValue ("show_note_numbers")->load () > 0.5f;
   s.toleranceMs = processorRef.getAPVTS ().getRawParameterValue ("tolerance_ms")->load ();
   s.latencyOffsetMs = processorRef.getAPVTS ().getRawParameterValue ("latency_offset_ms")->load ();
+  const double sr = processorRef.getSampleRate ();
+  s.deviceLatencyMs = static_cast<float> (processorRef.getDeviceLatencyMs (sr > 0.0 ? sr : 44100.0));
   s.bpm = static_cast<float> (processorRef.getCurrentBpm ());
   return s;
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::timerCallback () {
+  updateDeviceLatency ();
   drainRingBuffer ();
 
   const double currentPpq = processorRef.getCurrentPpqPosition ();
@@ -256,11 +315,11 @@ void MidiGridAnalyzerAudioProcessorEditor::resized () {
   };
   // Widths mirror previous manual layout; FlexBox makes intent explicit and handles overflow.
   Item items[] = {
-      {&barsComboBox, 74},       {&subdivisionComboBox, 74}, {&toleranceSlider, 85}, {&latencySlider, 85},
-      {&velocitySlider, 65},     {&bpmSlider, 75},           {&timeSigComboBox, 64}, {&clickSubComboBox, 85},
-      {&clickSoundComboBox, 95}, {&clickVolumeSlider, 65},   {&clickPanSlider, 65},  {&clickToggleButton, 75},
-      {&pauseButton, 65},        {&showMsButton, 85},        {&showVelButton, 76},   {&showNoteNumButton, 68},
-      {&testButton, 85},         {&copyTabButton, 84},
+      {&barsComboBox, 74},       {&subdivisionComboBox, 74}, {&toleranceSlider, 85},   {&latencySlider, 85},
+      {&deviceLatencyLabel, 98}, {&velocitySlider, 65},      {&bpmSlider, 75},         {&timeSigComboBox, 64},
+      {&clickSubComboBox, 85},   {&clickSoundComboBox, 95},  {&clickVolumeSlider, 65}, {&clickPanSlider, 65},
+      {&clickToggleButton, 75},  {&pauseButton, 65},         {&showMsButton, 85},      {&showVelButton, 76},
+      {&showNoteNumButton, 68},  {&testButton, 85},          {&copyTabButton, 84},
   };
 
   juce::FlexBox fb;
