@@ -118,6 +118,34 @@ double MidiGridAnalyzerAudioProcessor::getSubdivisionPpq (int index) noexcept {
   }
 }
 
+double MidiGridAnalyzerAudioProcessor::getClickSubdivisionPpq (int index) noexcept {
+  using namespace constants::musical;
+  switch (index) {
+  case 1:
+    return ppq_click_1_4;
+  case 2:
+    return ppq_click_1_8;
+  case 3:
+    return ppq_click_1_16;
+  case 4:
+    return ppq_click_triplet;
+  default:
+    return 0.0;
+  }
+}
+
+double MidiGridAnalyzerAudioProcessor::getEffectiveGridInterval (const ParamSnapshot &p) noexcept {
+  // Drummer hears click subdivisions — that's the grid that matters for timing.
+  // If click is enabled and has a subdivision, use that; otherwise fall back to display grid.
+  if (p.clickEnabled) {
+    const double clickPpq = getClickSubdivisionPpq (p.clickSubChoice);
+    if (clickPpq > 0.0) {
+      return clickPpq;
+    }
+  }
+  return getSubdivisionPpq (p.subChoice);
+}
+
 MidiGridAnalyzerAudioProcessor::ParamSnapshot
 MidiGridAnalyzerAudioProcessor::readSnapshot (const juce::AudioProcessorValueTreeState &state) noexcept {
   ParamSnapshot s;
@@ -412,8 +440,8 @@ void MidiGridAnalyzerAudioProcessor::generateTestModeBeat (double blockStartPpq,
 // ── Calibration wizard ──
 void MidiGridAnalyzerAudioProcessor::startCalibration () {
   const ParamSnapshot p = readSnapshot (apvts);
-  const double gridInterval = getSubdivisionPpq (p.subChoice);
-  if (gridInterval <= 0.0 || p.timeSigNum <= 0 || currentBpm <= 0.0) {
+  const double effectiveIntervalForCalib = getEffectiveGridInterval (p);
+  if (effectiveIntervalForCalib <= 0.0 || p.timeSigNum <= 0 || currentBpm <= 0.0) {
     return;
   }
   {
@@ -422,7 +450,7 @@ void MidiGridAnalyzerAudioProcessor::startCalibration () {
     calibResult = {};
   }
   calibBpm = currentBpm;
-  calibGridInterval = gridInterval;
+  calibGridInterval = effectiveIntervalForCalib;
   calibTimeSigNum = p.timeSigNum;
   // Grid-synced: start at next bar line (beat 1), so count-in is exactly 1 bar
   // e.g., if now at 2.3 and 4/4, next bar is 4.0, count 4..1, then rec at 8.0

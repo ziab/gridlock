@@ -11,6 +11,7 @@ struct GridViewState {
   double currentPpq{0.0};
   int numBars{4};
   double gridSubdivisionPpq{constants::musical::ppq_default};
+  double effectiveInterval{constants::musical::ppq_default}; // What drummer hears (click if enabled)
   int timeSigNum{constants::params::timeSigDefault};
   bool showMsLabels{true};
   bool showVelocityLabels{false};

@@ -204,11 +204,12 @@ class ConnectionService extends ChangeNotifier {
     calibrationHasResult = (json['hasResult'] as bool?) ?? false;
     calibrationBpm = (json['bpm'] as num?)?.toDouble() ?? 120.0;
     calibrationTimeSigNum = (json['timeSigNum'] as num?)?.toInt() ?? 4;
-    // Auto-reset DONE -> idle after 3s so button becomes active again (throne-friendly)
+    // Auto-reset DONE -> idle after 3s only when no valid result (no hits / jitter)
+    // Valid result (hasResult true) keeps APPLY dialog until user acts — only the "DONE" banner disappears
     _calibrationAutoResetTimer?.cancel();
-    if (calibrationState == 'done' && prev != 'done') {
+    if (calibrationState == 'done' && prev != 'done' && !calibrationHasResult) {
       _calibrationAutoResetTimer = Timer(const Duration(seconds: 3), () {
-        if (calibrationState == 'done') {
+        if (calibrationState == 'done' && !calibrationHasResult) {
           cancelCalibration();
         }
       });

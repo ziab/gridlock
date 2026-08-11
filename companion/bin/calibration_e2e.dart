@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print, unused_local_variable
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -131,7 +132,8 @@ Future<_Server?> _discover({Duration timeout = const Duration(seconds: 3)}) asyn
       if (dg == null) return;
       final msg = String.fromCharCodes(dg.data).trim();
       if (msg.startsWith('GRIDLOCK_HERE:')) {
-        final port = int.tryParse(msg.split(':')[1] ?? '') ?? 9876;
+        final parts = msg.split(':');
+        final port = parts.length > 1 ? int.tryParse(parts[1]) ?? 9876 : 9876;
         final ip = dg.address.address;
         if (!completer.isCompleted) completer.complete(_Server(ip, port));
       }

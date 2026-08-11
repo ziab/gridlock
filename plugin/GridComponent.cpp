@@ -68,6 +68,9 @@ void GridComponent::update (const GridViewState &state, const std::vector<HitEve
   if (view.gridSubdivisionPpq <= 0.0) {
     view.gridSubdivisionPpq = 0.25;
   }
+  if (view.effectiveInterval <= 0.0) {
+    view.effectiveInterval = view.gridSubdivisionPpq;
+  }
   if (view.timeSigNum <= 0) {
     view.timeSigNum = 4;
   }

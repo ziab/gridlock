@@ -613,9 +613,12 @@ public:
     {
       MidiGridAnalyzerAudioProcessor p;
       p.prepareToPlay (44100.0, 512);
-      // Force 4/4 1/8 for deterministic expected = 32
+      // Force 4/4 1/8 for deterministic expected = 32 — disable click so effective == display
       if (auto *param = p.getAPVTS ().getParameter ("subdivision")) {
         param->setValueNotifyingHost (param->convertTo0to1 (0.0f)); // 1/8
+      }
+      if (auto *param = p.getAPVTS ().getParameter ("click_enabled")) {
+        param->setValueNotifyingHost (0.0f);
       }
       if (auto *param = p.getAPVTS ().getParameter ("time_sig_num")) {
         param->setValueNotifyingHost (param->convertTo0to1 (4.0f));
@@ -661,6 +664,9 @@ public:
       p.prepareToPlay (44100.0, 512);
       if (auto *param = p.getAPVTS ().getParameter ("subdivision")) {
         param->setValueNotifyingHost (param->convertTo0to1 (0.0f));
+      }
+      if (auto *param = p.getAPVTS ().getParameter ("click_enabled")) {
+        param->setValueNotifyingHost (0.0f);
       }
       p.startCalibration ();
       const double sr = 44100.0;
@@ -724,6 +730,9 @@ public:
       p2.prepareToPlay (44100.0, 512);
       if (auto *par = p2.getAPVTS ().getParameter ("subdivision")) {
         par->setValueNotifyingHost (par->convertTo0to1 (0.0f));
+      }
+      if (auto *par = p2.getAPVTS ().getParameter ("click_enabled")) {
+        par->setValueNotifyingHost (0.0f);
       }
       p2.startCalibration ();
       // Feed hits with alternating +50ms / -50ms (sd ~50) -> jitter >20

@@ -295,6 +295,9 @@ GridViewState MidiGridAnalyzerAudioProcessorEditor::buildGridViewState (int bars
   s.numBars = barsVal;
   s.gridSubdivisionPpq =
       MidiGridAnalyzerAudioProcessor::getSubdivisionPpq (subdivisionComboBox.getSelectedItemIndex ());
+  // Effective interval is what drummer hears (click if enabled)
+  const auto snap = MidiGridAnalyzerAudioProcessor::readSnapshot (processorRef.getAPVTS ());
+  s.effectiveInterval = MidiGridAnalyzerAudioProcessor::getEffectiveGridInterval (snap);
   s.timeSigNum = processorRef.getCurrentTimeSigNum ();
   s.showMsLabels = processorRef.getAPVTS ().getRawParameterValue ("show_ms_labels")->load () > 0.5f;
   s.showVelocityLabels = processorRef.getAPVTS ().getRawParameterValue ("show_velocity_labels")->load () > 0.5f;
@@ -351,15 +354,21 @@ void MidiGridAnalyzerAudioProcessorEditor::updateCalibrationUI () {
   }
   if (st == MidiGridAnalyzerAudioProcessor::CalibState::Done) {
     // PC is passive — companion shows Apply/Add dialog if online.
-    // Just show DONE for 3s then auto-reset to CALIBRATE (throne-friendly)
+    // Only auto-reset when no valid result (no hits / jitter) — valid APPLY stays until companion acts
     calibrateButton.setButtonText ("DONE");
     calibCountOverlay.setVisible (false);
     if (lastCalibStateSeen != stInt) {
-      juce::Timer::callAfterDelay (3000, [this] {
-        if (processorRef.getCalibrationState () == MidiGridAnalyzerAudioProcessor::CalibState::Done) {
-          processorRef.cancelCalibration ();
-        }
-      });
+      const auto res = processorRef.getCalibrationResult ();
+      if (!res.hasResult) {
+        juce::Timer::callAfterDelay (3000, [this] {
+          if (processorRef.getCalibrationState () == MidiGridAnalyzerAudioProcessor::CalibState::Done) {
+            auto r2 = processorRef.getCalibrationResult ();
+            if (!r2.hasResult) {
+              processorRef.cancelCalibration ();
+            }
+          }
+        });
+      }
     }
     lastCalibStateSeen = stInt;
   }
