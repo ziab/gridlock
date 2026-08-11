@@ -604,6 +604,154 @@ public:
 };
 static CalibrationTest calibrationTest;
 
+// ── CalibrationIntegration (end-to-end, catches no-hits / live progress bugs) ──
+class CalibrationIntegrationTest : public juce::UnitTest {
+public:
+  CalibrationIntegrationTest () : UnitTest ("CalibrationIntegration", "P1") {}
+  void runTest () override {
+    beginTest ("full wizard 4 bars 1/8 collects 32 hits on grid");
+    {
+      MidiGridAnalyzerAudioProcessor p;
+      p.prepareToPlay (44100.0, 512);
+      // Force 4/4 1/8 for deterministic expected = 32
+      if (auto *param = p.getAPVTS ().getParameter ("subdivision")) {
+        param->setValueNotifyingHost (param->convertTo0to1 (0.0f)); // 1/8
+      }
+      if (auto *param = p.getAPVTS ().getParameter ("time_sig_num")) {
+        param->setValueNotifyingHost (param->convertTo0to1 (4.0f));
+      }
+      p.startCalibration ();
+      expect (p.getCalibrationState () == MidiGridAnalyzerAudioProcessor::CalibState::CountIn);
+      const double sr = 44100.0;
+      const int blockSize = 512;
+      const double ppqPerSample = (120.0 / 60.0) / sr;
+      // Simulate 6 bars of audio (count-in 1 + rec 4 + 1 extra) to cover window
+      juce::AudioBuffer<float> buf (2, blockSize);
+      for (int block = 0; block < 1200; ++block) {
+        const double blockStart = p.getCurrentPpqPosition ();
+        const double blockEnd = blockStart + blockSize * ppqPerSample;
+        // Collect expected ticks within this block's recording window
+        // We push hits at every 0.5 PPQ (1/8) inside rec window [4,20)
+        juce::MidiBuffer midi;
+        for (double tick = 4.0; tick < 20.0; tick += 0.5) {
+          if (tick >= blockStart && tick < blockEnd) {
+            const int offset =
+                juce::jlimit (0, blockSize - 1, static_cast<int> (std::round ((tick - blockStart) / ppqPerSample)));
+            midi.addEvent (juce::MidiMessage::noteOn (1, 36, (juce::uint8)100), offset);
+          }
+        }
+        p.processBlock (buf, midi);
+        if (p.getCalibrationState () == MidiGridAnalyzerAudioProcessor::CalibState::Done) {
+          break;
+        }
+      }
+      auto res = p.getCalibrationResult ();
+      expect (res.hasResult);
+      expectEquals (res.hitCount, 32);
+      expectEquals (res.expectedHits, 32);
+      expectWithinAbsoluteError (res.meanMs, 0.0, 2.0); // on-grid
+      // Live progress JSON during recording should have reported hitCount >0 (not stuck 0)
+      auto json = p.getCalibrationStateJson ();
+      // After Done, json should contain hitCount 32
+      expect (json.contains ("32"));
+    }
+    beginTest ("early rush hits just before window are still counted (no-hits bug)");
+    {
+      MidiGridAnalyzerAudioProcessor p;
+      p.prepareToPlay (44100.0, 512);
+      if (auto *param = p.getAPVTS ().getParameter ("subdivision")) {
+        param->setValueNotifyingHost (param->convertTo0to1 (0.0f));
+      }
+      p.startCalibration ();
+      const double sr = 44100.0;
+      const int blockSize = 512;
+      const double ppqPerSample = (120.0 / 60.0) / sr;
+      juce::AudioBuffer<float> buf (2, blockSize);
+      // Push hits 10ms early (rush) at every subdivision: raw = grid - 0.02 PPQ (~10ms at 120)
+      for (int block = 0; block < 1200; ++block) {
+        const double blockStart = p.getCurrentPpqPosition ();
+        const double blockEnd = blockStart + blockSize * ppqPerSample;
+        juce::MidiBuffer midi;
+        for (double tick = 4.0; tick < 20.0; tick += 0.5) {
+          const double raw = tick - 0.02; // 10ms early
+          if (raw >= blockStart && raw < blockEnd) {
+            const int offset =
+                juce::jlimit (0, blockSize - 1, static_cast<int> (std::round ((raw - blockStart) / ppqPerSample)));
+            midi.addEvent (juce::MidiMessage::noteOn (1, 38, (juce::uint8)100), offset);
+          }
+        }
+        p.processBlock (buf, midi);
+        if (p.getCalibrationState () == MidiGridAnalyzerAudioProcessor::CalibState::Done) {
+          break;
+        }
+      }
+      auto res = p.getCalibrationResult ();
+      expect (res.hasResult);
+      expectEquals (res.hitCount, 32);                   // early hits still counted via nearestGrid
+      expectWithinAbsoluteError (res.meanMs, 0.0, 1e-6); // rush clamped to 0 (latency cannot be negative)
+      // Apply should clamp to 0, not negative
+      p.applyCalibrationResult (false);
+      const float lat = p.getAPVTS ().getRawParameterValue ("latency_offset_ms")->load ();
+      expectWithinAbsoluteError (lat, 0.0f, 1e-6f);
+    }
+    beginTest ("0 hits and high jitter keep old latency");
+    {
+      MidiGridAnalyzerAudioProcessor p;
+      p.prepareToPlay (44100.0, 512);
+      // Set initial latency 20
+      if (auto *param = p.getAPVTS ().getParameter ("latency_offset_ms")) {
+        param->setValueNotifyingHost (param->convertTo0to1 (20.0f));
+      }
+      p.startCalibration ();
+      juce::AudioBuffer<float> buf (2, 512);
+      // Run without any hits for 6 bars
+      for (int i = 0; i < 1200; ++i) {
+        juce::MidiBuffer empty;
+        p.processBlock (buf, empty);
+        if (p.getCalibrationState () == MidiGridAnalyzerAudioProcessor::CalibState::Done) {
+          break;
+        }
+      }
+      auto res = p.getCalibrationResult ();
+      expect (!res.hasResult);
+      expectEquals (res.hitCount, 0);
+      const float before = p.getAPVTS ().getRawParameterValue ("latency_offset_ms")->load ();
+      p.applyCalibrationResult (false);
+      const float after = p.getAPVTS ().getRawParameterValue ("latency_offset_ms")->load ();
+      expectWithinAbsoluteError (before, after, 1e-6f); // keep old
+      // High jitter: hits with huge variance -> hasResult false
+      MidiGridAnalyzerAudioProcessor p2;
+      p2.prepareToPlay (44100.0, 512);
+      if (auto *par = p2.getAPVTS ().getParameter ("subdivision")) {
+        par->setValueNotifyingHost (par->convertTo0to1 (0.0f));
+      }
+      p2.startCalibration ();
+      // Feed hits with alternating +50ms / -50ms (sd ~50) -> jitter >20
+      for (int block = 0; block < 1200; ++block) {
+        const double bs = p2.getCurrentPpqPosition ();
+        const double be = bs + 512 * (120.0 / 60.0) / 44100.0;
+        juce::MidiBuffer midi;
+        for (double tick = 4.0; tick < 20.0; tick += 0.5) {
+          double delta = (static_cast<int> (tick * 2) % 2 == 0) ? 0.1 : -0.1; // +/-50ms ~0.1 PPQ
+          double raw = tick + delta;
+          if (raw >= bs && raw < be) {
+            int off = juce::jlimit (0, 511, static_cast<int> (std::round ((raw - bs) / ((120.0 / 60.0) / 44100.0))));
+            midi.addEvent (juce::MidiMessage::noteOn (1, 36, (juce::uint8)100), off);
+          }
+        }
+        p2.processBlock (buf, midi);
+        if (p2.getCalibrationState () == MidiGridAnalyzerAudioProcessor::CalibState::Done) {
+          break;
+        }
+      }
+      auto r2 = p2.getCalibrationResult ();
+      // High jitter should be indecisive -> hasResult false (or sd >20)
+      expect (!r2.hasResult || r2.sdMs > 20.0);
+    }
+  }
+};
+static CalibrationIntegrationTest calibrationIntegrationTest;
+
 // ── runner ──
 int main () {
   juce::ScopedJuceInitialiser_GUI juceInit;

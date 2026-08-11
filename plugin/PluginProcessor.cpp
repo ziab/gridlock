@@ -379,6 +379,15 @@ void MidiGridAnalyzerAudioProcessor::generateTestModeBeat (double blockStartPpq,
       const double targetCompPpq = tick + devPpq;
       ringBuffer.push (
           makeQuantizedHit (note, vel, targetCompPpq, gridInterval, currentBpm, toleranceMs, totalLatencyPpq));
+      // Also feed calibration if in recording window (test_mode hit also counts)
+      if (calibState.load () == static_cast<int> (CalibState::Recording) && note == DrumMap::ClosedHiHat) {
+        const double nearest = std::round (targetCompPpq / calibGridInterval) * calibGridInterval;
+        if (nearest >= calibRecStartPpq - 1e-9 && nearest < calibRecEndPpq - 1e-9) {
+          const auto ct = Timing::compute (targetCompPpq, calibGridInterval, calibBpm, toleranceMs);
+          std::lock_guard<std::mutex> lock (calibMutex);
+          calibDeltas.push_back (ct.deltaMs);
+        }
+      }
     };
 
     emit (DrumMap::ClosedHiHat, static_cast<uint8_t> (DrumMap::TestModeVelocity::BaseHiHat +
@@ -581,12 +590,24 @@ void MidiGridAnalyzerAudioProcessor::finalizeCalibration () {
 }
 
 juce::String MidiGridAnalyzerAudioProcessor::getCalibrationStateJson () const {
-  if (!calibNeedsBroadcast.load ()) {
-    return {};
-  }
-  // Only broadcast once per state change; caller will clear after send
-  const_cast<std::atomic<bool> &> (calibNeedsBroadcast).store (false);
   const auto st = static_cast<CalibState> (calibState.load ());
+  const bool needs = calibNeedsBroadcast.load ();
+  // Idle: only broadcast when state just changed to idle (needs flag)
+  if (st == CalibState::Idle) {
+    if (!needs) {
+      return {};
+    }
+    const_cast<std::atomic<bool> &> (calibNeedsBroadcast).store (false);
+  } else if (st == CalibState::CountIn || st == CalibState::Recording) {
+    // Live progress during count-in/recording — broadcast every poll (10Hz)
+    // so companion shows hit count and progress continuously.
+    // Don't clear needs flag here; keep it for Done transition.
+  } else if (st == CalibState::Done) {
+    if (!needs) {
+      return {};
+    }
+    const_cast<std::atomic<bool> &> (calibNeedsBroadcast).store (false);
+  }
   const char *stateStr = "idle";
   if (st == CalibState::CountIn) {
     stateStr = "countin";
@@ -600,13 +621,22 @@ juce::String MidiGridAnalyzerAudioProcessor::getCalibrationStateJson () const {
   obj->setProperty ("state", stateStr);
   obj->setProperty ("progress", getCalibrationProgress ());
   obj->setProperty ("beatsRemaining", getCalibrationBeatsRemaining ());
+  // Live hit count during recording vs final result when done
+  int liveHits = 0;
+  {
+    std::lock_guard<std::mutex> lock (const_cast<std::mutex &> (calibMutex));
+    liveHits = static_cast<int> (calibDeltas.size ());
+  }
   CalibResult r = getCalibrationResult ();
+  // During recording, report live hits; when done, report final result
+  const int hitCountToReport = (st == CalibState::Done) ? r.hitCount : liveHits;
+  const bool hasResToReport = (st == CalibState::Done) ? r.hasResult : false;
   obj->setProperty ("meanMs", r.meanMs);
   obj->setProperty ("medianMs", r.medianMs);
   obj->setProperty ("sdMs", r.sdMs);
-  obj->setProperty ("hitCount", r.hitCount);
-  obj->setProperty ("expectedHits", r.expectedHits);
-  obj->setProperty ("hasResult", r.hasResult);
+  obj->setProperty ("hitCount", hitCountToReport);
+  obj->setProperty ("expectedHits", r.expectedHits > 0 ? r.expectedHits : calibExpectedHits);
+  obj->setProperty ("hasResult", hasResToReport);
   // Include grid context for UI
   obj->setProperty ("bpm", calibBpm);
   obj->setProperty ("gridInterval", calibGridInterval);
