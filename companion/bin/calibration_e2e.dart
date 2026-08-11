@@ -81,6 +81,10 @@ Future<void> main() async {
   await Future.delayed(Duration(milliseconds: 100));
   send({'type': 'set', 'id': 'subdivision', 'value': 0.0}); // 1/8
   await Future.delayed(Duration(milliseconds: 100));
+  send({'type': 'set', 'id': 'click_enabled', 'value': 0.0}); // disable click so effective == display (32 hits) — otherwise default 1/4 vs 1/8 gives 250ms jitter -> hasResult false
+  await Future.delayed(Duration(milliseconds: 100));
+  send({'type': 'set', 'id': 'click_subdivision', 'value': 0.0}); // Off
+  await Future.delayed(Duration(milliseconds: 100));
   send({'type': 'set', 'id': 'test_mode', 'value': 1.0});
   await Future.delayed(Duration(milliseconds: 200));
   // Ensure clean start
