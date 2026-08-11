@@ -144,6 +144,9 @@ struct HitEvent {
 * `Crypto::sha1()` (`plugin/Crypto.h`) — RFC 3174 SHA-1 extracted from `RemoteControlServer.cpp` for WS handshake `Sec-WebSocket-Accept`.
 * `RingBuffer<N>` (`plugin/RingBuffer.h`) — `juce::AbstractFifo` wrapper; capacity `N` holds `N-1` items (one slot gap) — `4096` → `4095`.
 
+### 4.4b Window State Persistence (`PluginEditor.h:110` w)
+* `isMaximized` stored in `ApplicationProperties` (`Gridlock/settings.xml` + `PropertiesFile` for standalone) and `APVTS` child `uiState/isMaximized` for DAW reload. Restored in `parentHierarchyChanged` via `DocumentWindow::isFullScreen`, saved on destroy + 60Hz poll. Standalone-only (VST host owns window).
+
 ### 4.4 Centralized E-Kit Drum Map & Constants (`Source/DrumMap.h`)
 * **Single Source of Truth (`DrumMap.h`)**:
   - Centralized General MIDI / Roland e-Kit constants: `Kick` (36), `SnareHead` (38), `SnareRim` (40), `ClosedHiHat` (42), `PedalHiHat` (44), `OpenHiHat` (46), `HighTom` (48), `MidTom` (45), `LowTom` (43), `Crash1` (49), `Ride` (51), `Crash2` (53), `ChineseCymbal` (52), `SplashCymbal` (55), `Crash2Edge` (57), `CymbalEdge29` (29), `CymbalBell30` (30).

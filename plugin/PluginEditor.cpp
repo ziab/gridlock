@@ -211,6 +211,7 @@ void MidiGridAnalyzerAudioProcessorEditor::setupTimeSigHandling () {
 }
 
 MidiGridAnalyzerAudioProcessorEditor::~MidiGridAnalyzerAudioProcessorEditor () {
+  saveWindowState ();
   openGLContext.detach ();
   juce::Desktop::setScreenSaverEnabled (true);
   stopTimer ();
@@ -225,6 +226,93 @@ void MidiGridAnalyzerAudioProcessorEditor::parentHierarchyChanged () {
                                           false);
     }
   }
+  if (!windowStateRestored) {
+    restoreWindowState ();
+  }
+}
+
+bool MidiGridAnalyzerAudioProcessorEditor::isWindowMaximized () const {
+  if (auto *top = getTopLevelComponent ()) {
+    if (auto *dw = dynamic_cast<juce::DocumentWindow *> (top)) {
+      return dw->isFullScreen ();
+    }
+    if (auto *peer = top->getPeer ()) {
+      return peer->isFullScreen ();
+    }
+  }
+  return false;
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::setWindowMaximized (bool shouldBeMaximized) {
+  if (auto *top = getTopLevelComponent ()) {
+    if (auto *dw = dynamic_cast<juce::DocumentWindow *> (top)) {
+      dw->setFullScreen (shouldBeMaximized);
+      return;
+    }
+    if (auto *peer = top->getPeer ()) {
+      peer->setFullScreen (shouldBeMaximized);
+    }
+  }
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::saveWindowState () {
+  if (!processorRef.isStandaloneAppMode ()) {
+    return;
+  }
+  const bool isMax = isWindowMaximized ();
+  // Persist for DAW reload via APVTS child (host saves state)
+  auto &state = processorRef.getAPVTS ().state;
+  state.getOrCreateChildWithName ("uiState", nullptr).setProperty ("isMaximized", isMax, nullptr);
+  // Persist across standalone restarts via PropertiesFile
+  juce::ApplicationProperties props;
+  juce::PropertiesFile::Options opts;
+  opts.applicationName = "Gridlock";
+  opts.folderName = "Gridlock";
+  opts.filenameSuffix = "settings";
+  opts.storageFormat = juce::PropertiesFile::storeAsXML;
+  opts.millisecondsBeforeSaving = 0;
+  props.setStorageParameters (opts);
+  if (auto *file = props.getUserSettings ()) {
+    file->setValue ("isMaximized", isMax);
+  }
+  lastMaximizedState = isMax;
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::restoreWindowState () {
+  if (!processorRef.isStandaloneAppMode ()) {
+    return;
+  }
+  bool shouldMax = false;
+  bool found = false;
+  // Prefer PropertiesFile (survives without host save)
+  {
+    juce::ApplicationProperties props;
+    juce::PropertiesFile::Options opts;
+    opts.applicationName = "Gridlock";
+    opts.folderName = "Gridlock";
+    opts.filenameSuffix = "settings";
+    opts.storageFormat = juce::PropertiesFile::storeAsXML;
+    props.setStorageParameters (opts);
+    if (auto *file = props.getUserSettings ()) {
+      if (file->containsKey ("isMaximized")) {
+        shouldMax = file->getBoolValue ("isMaximized", false);
+        found = true;
+      }
+    }
+  }
+  // Fallback to APVTS child (for plugin in DAW)
+  if (!found) {
+    auto uiState = processorRef.getAPVTS ().state.getChildWithName ("uiState");
+    if (uiState.isValid ()) {
+      shouldMax = static_cast<bool> (uiState.getProperty ("isMaximized", false));
+    }
+  }
+  if (shouldMax) {
+    // Defer until peer exists
+    juce::MessageManager::callAsync ([this] { setWindowMaximized (true); });
+  }
+  lastMaximizedState = shouldMax;
+  windowStateRestored = true;
 }
 
 // ── timer ──
@@ -311,6 +399,12 @@ GridViewState MidiGridAnalyzerAudioProcessorEditor::buildGridViewState (int bars
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::timerCallback () {
+  if (windowStateRestored && processorRef.isStandaloneAppMode ()) {
+    const bool curMax = isWindowMaximized ();
+    if (curMax != lastMaximizedState) {
+      saveWindowState ();
+    }
+  }
   updateDeviceLatency ();
   updateCalibrationUI ();
   drainRingBuffer ();

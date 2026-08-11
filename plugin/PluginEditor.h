@@ -18,6 +18,10 @@ public:
 
 private:
   void timerCallback () override;
+  void saveWindowState ();
+  void restoreWindowState ();
+  bool isWindowMaximized () const;
+  void setWindowMaximized (bool shouldBeMaximized);
 
   void setupControls ();
   void attachParameters ();
@@ -104,6 +108,8 @@ private:
   std::vector<HitEvent> eventHistory;
 
   int lastCalibStateSeen{0};
+  bool lastMaximizedState{false};
+  bool windowStateRestored{false};
 
   juce::OpenGLContext openGLContext;
 
