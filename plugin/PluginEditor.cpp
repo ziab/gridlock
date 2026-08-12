@@ -210,7 +210,11 @@ void MidiGridAnalyzerAudioProcessorEditor::setupTimeSigHandling () {
 }
 
 MidiGridAnalyzerAudioProcessorEditor::~MidiGridAnalyzerAudioProcessorEditor () {
-  saveWindowState ();
+  // Don't query peer here — top-level may already be detached (returns false and
+  // would overwrite a previously saved maximized=true). Persist last known state.
+  if (processorRef.isStandaloneAppMode () && windowStateRestored) {
+    persistMaximizedState (lastMaximizedState);
+  }
   openGLContext.detach ();
   juce::Desktop::setScreenSaverEnabled (true);
   stopTimer ();
@@ -254,14 +258,13 @@ void MidiGridAnalyzerAudioProcessorEditor::setWindowMaximized (bool shouldBeMaxi
   }
 }
 
-void MidiGridAnalyzerAudioProcessorEditor::saveWindowState () {
+void MidiGridAnalyzerAudioProcessorEditor::persistMaximizedState (bool isMaximized) {
   if (!processorRef.isStandaloneAppMode ()) {
     return;
   }
-  const bool isMax = isWindowMaximized ();
   // Persist for DAW reload via APVTS child (host saves state)
   auto &state = processorRef.getAPVTS ().state;
-  state.getOrCreateChildWithName ("uiState", nullptr).setProperty ("isMaximized", isMax, nullptr);
+  state.getOrCreateChildWithName ("uiState", nullptr).setProperty ("isMaximized", isMaximized, nullptr);
   // Persist across standalone restarts via PropertiesFile
   juce::ApplicationProperties props;
   juce::PropertiesFile::Options opts;
@@ -272,9 +275,24 @@ void MidiGridAnalyzerAudioProcessorEditor::saveWindowState () {
   opts.millisecondsBeforeSaving = 0;
   props.setStorageParameters (opts);
   if (auto *file = props.getUserSettings ()) {
-    file->setValue ("isMaximized", isMax);
+    file->setValue ("isMaximized", isMaximized);
   }
-  lastMaximizedState = isMax;
+  lastMaximizedState = isMaximized;
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::saveWindowState () {
+  if (!processorRef.isStandaloneAppMode ()) {
+    return;
+  }
+  // If peer not yet available (startup/shutdown), don't overwrite cached state
+  // with a false reading — keep lastMaximizedState.
+  if (getTopLevelComponent () == nullptr || getTopLevelComponent ()->getPeer () == nullptr) {
+    // Still persist the last known value so APVTS child is initialised
+    persistMaximizedState (lastMaximizedState);
+    return;
+  }
+  const bool isMax = isWindowMaximized ();
+  persistMaximizedState (isMax);
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::restoreWindowState () {
@@ -306,12 +324,24 @@ void MidiGridAnalyzerAudioProcessorEditor::restoreWindowState () {
       shouldMax = static_cast<bool> (uiState.getProperty ("isMaximized", false));
     }
   }
-  if (shouldMax) {
-    // Defer until peer exists
-    juce::MessageManager::callAsync ([this] { setWindowMaximized (true); });
-  }
   lastMaximizedState = shouldMax;
   windowStateRestored = true;
+  windowMaximizePending = shouldMax;
+  if (shouldMax) {
+    // Defer until peer exists; editor parentHierarchyChanged can fire before
+    // the DocumentWindow peer is created, so retry with delays.
+    auto doMax = [this] {
+      if (getTopLevelComponent () != nullptr && !isWindowMaximized ()) {
+        setWindowMaximized (true);
+      }
+    };
+    juce::MessageManager::callAsync (doMax);
+    juce::Timer::callAfterDelay (100, doMax);
+    juce::Timer::callAfterDelay (300, doMax);
+    juce::Timer::callAfterDelay (600, doMax);
+    // Unblock polling after 1s even if fullscreen never took (e.g. headless)
+    juce::Timer::callAfterDelay (1000, [this] { windowMaximizePending = false; });
+  }
 }
 
 // ── timer ──
@@ -399,9 +429,22 @@ GridViewState MidiGridAnalyzerAudioProcessorEditor::buildGridViewState (int bars
 
 void MidiGridAnalyzerAudioProcessorEditor::timerCallback () {
   if (windowStateRestored && processorRef.isStandaloneAppMode ()) {
-    const bool curMax = isWindowMaximized ();
-    if (curMax != lastMaximizedState) {
-      saveWindowState ();
+    // Don't poll while the initial maximize is still pending (peer may not
+    // have applied fullscreen yet); otherwise we would see curMax=false vs
+    // last=true and overwrite the persisted true with false.
+    if (getTopLevelComponent () == nullptr || getTopLevelComponent ()->getPeer () == nullptr) {
+      // Peer not ready — keep pending, skip save
+    } else {
+      const bool curMax = isWindowMaximized ();
+      if (windowMaximizePending) {
+        if (curMax == lastMaximizedState) {
+          windowMaximizePending = false;
+        } else {
+          // Still pending — don't treat transient false as user restore
+        }
+      } else if (curMax != lastMaximizedState) {
+        saveWindowState ();
+      }
     }
   }
   updateDeviceLatency ();

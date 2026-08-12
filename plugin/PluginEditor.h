@@ -19,6 +19,7 @@ public:
 private:
   void timerCallback () override;
   void saveWindowState ();
+  void persistMaximizedState (bool isMaximized);
   void restoreWindowState ();
   bool isWindowMaximized () const;
   void setWindowMaximized (bool shouldBeMaximized);
@@ -110,6 +111,7 @@ private:
   int lastCalibStateSeen{0};
   bool lastMaximizedState{false};
   bool windowStateRestored{false};
+  bool windowMaximizePending{false};
 
   juce::OpenGLContext openGLContext;
 
