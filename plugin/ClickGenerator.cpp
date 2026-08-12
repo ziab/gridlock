@@ -89,36 +89,10 @@ void ClickGenerator::synthesizeAllPresets (double sampleRate) {
     }
   };
 
-  auto makeDualToneBuffer = [this, sr] (juce::AudioBuffer<float> &target, float freq1, float freq2, float durationMs,
-                                        float gain) {
-    const int numSamples = std::max (1, static_cast<int> (std::ceil (sr * (durationMs / 1000.0))));
-    target.setSize (1, numSamples);
-    float *channel = target.getWritePointer (0);
-
-    double phase1 = 0.0, phase2 = 0.0;
-    const double phaseDelta1 = (2.0 * juce::MathConstants<double>::pi * freq1) / sr;
-    const double phaseDelta2 = (2.0 * juce::MathConstants<double>::pi * freq2) / sr;
-
-    for (int i = 0; i < numSamples; ++i) {
-      const float progress = static_cast<float> (i) / static_cast<float> (numSamples);
-      const float env = std::exp (-progress * 12.0f);
-      const float tone = (std::sin (phase1) + 0.6f * std::sin (phase2)) * 0.625f;
-      phase1 += phaseDelta1;
-      phase2 += phaseDelta2;
-
-      channel[i] = tone * env * gain;
-    }
-  };
-
-  // Preset 2: Digital Beep
-  makeToneBuffer (presetSamples[2].highClick, 2500.0f, 30.0f, 5.00f, 0.50f, 6.0f);
-  makeToneBuffer (presetSamples[2].midClick, 2000.0f, 20.0f, 3.50f, 0.30f, 6.0f);
-  makeToneBuffer (presetSamples[2].subClick, 1000.0f, 10.0f, 1.00f, 0.00f, 8.0f);
-
-  // Preset 3: Cowbell
-  makeDualToneBuffer (presetSamples[3].highClick, 800.0f, 540.0f, 25.0f, 1.00f);
-  makeDualToneBuffer (presetSamples[3].midClick, 560.0f, 380.0f, 20.0f, 0.75f);
-  makeDualToneBuffer (presetSamples[3].subClick, 440.0f, 300.0f, 12.0f, 0.45f);
+  // Preset: Digital Beep
+  makeToneBuffer (presetSamples[2].highClick, 2100.0f, 30.0f, 6.00f, 0.50f, 6.0f);
+  makeToneBuffer (presetSamples[2].midClick, 2000.0f, 30.0f, 4.00f, 0.40f, 6.0f);
+  makeToneBuffer (presetSamples[2].subClick, 1800.0f, 25.0f, 4.00f, 0.30f, 8.0f);
 }
 
 double ClickGenerator::getClickSubdivisionPpq (int index) const noexcept {

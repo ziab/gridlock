@@ -114,8 +114,7 @@ void MidiGridAnalyzerAudioProcessorEditor::setupControls () {
   styleCombo (timeSigComboBox, {"2/4", "3/4", "4/4", "5/4", "6/8", "7/8"}, timeSigLabel, "Time Sig:");
   styleCombo (clickSubComboBox, {"Off", "1/4 Notes", "1/8 Notes", "1/16 Notes", "Triplets"}, clickSubLabel,
               "Click Sub:");
-  styleCombo (clickSoundComboBox, {"Wood Clave", "Drum Stick Click", "Digital Beep", "Cowbell"}, clickSoundLabel,
-              "Click Sound:");
+  styleCombo (clickSoundComboBox, {"Wood Clave", "Drum Stick Click", "Digital Beep"}, clickSoundLabel, "Click Sound:");
   styleSlider (clickVolumeSlider, clickVolLabel, "Click Vol:", 35);
   styleSlider (clickPanSlider, clickPanLabel, "Click Pan:", 35);
 

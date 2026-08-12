@@ -81,8 +81,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
           constants::params::timeSigDefault);
   addChoice (params, "click_subdivision", "Click Subdivision",
              {"Off", "1/4 Notes", "1/8 Notes", "1/16 Notes", "Triplets"}, 1);
-  addChoice (params, "click_sample_preset", "Click Sound Preset",
-             {"Wood Clave", "Drum Stick Click", "Digital Beep", "Cowbell"}, 0);
+  addChoice (params, "click_sample_preset", "Click Sound Preset", {"Wood Clave", "Drum Stick Click", "Digital Beep"},
+             0);
   addFloat (params, "click_volume", "Click Volume",
             {constants::params::clickVolMin, constants::params::clickVolMax, constants::params::clickVolStep},
             constants::params::clickVolDefault);
