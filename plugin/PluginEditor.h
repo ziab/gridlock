@@ -42,6 +42,8 @@ private:
   GridViewState buildGridViewState (int barsVal) const;
   void updateDeviceLatency ();
   void updateCalibrationUI ();
+  void updateDrillUI ();
+  bool wasDrilling{false};
 
   static int indexForTimeSig (int num) noexcept;
   static int timeSigForIndex (int idx) noexcept;
@@ -58,6 +60,8 @@ private:
 
   juce::Component settingsContent;
   juce::Viewport settingsViewport;
+  juce::Component::SafePointer<juce::DialogWindow> drillWindow;
+  juce::TextButton drillButton{"Grouping Drill"};
   juce::TextButton settingsButton{"Settings"};
   juce::TextButton labelsButton{"Labels"};
   std::array<juce::TextButton, 4> barButtons;

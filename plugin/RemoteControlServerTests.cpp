@@ -66,6 +66,45 @@ static juce::AudioProcessorValueTreeState::ParameterLayout createTestLayout () {
   return {params.begin (), params.end ()};
 }
 
+static void sendTestText (juce::StreamingSocket &client, const juce::String &text) {
+  auto utf8 = text.toUTF8 ();
+  const size_t size = text.getNumBytesAsUTF8 ();
+  assert (size < 126);
+  std::vector<uint8_t> frame{0x81, static_cast<uint8_t> (0x80 | size), 0, 0, 0, 0};
+  frame.insert (frame.end (), utf8.getAddress (), utf8.getAddress () + size);
+  assert (client.write (frame.data (), static_cast<int> (frame.size ())) > 0);
+}
+
+static void testDrillProtocol (RemoteControlServer &server, juce::StreamingSocket &client) {
+  std::cout << "[Test 5] Drill command, acknowledgement, snapshot and disconnect..." << std::flush;
+  bool received = false, disconnected = false;
+  server.onDrillCommand = [&received] (const juce::var &message) {
+    received = message["action"].toString () == "start" && message["pattern"].toString () == "RLK";
+    return received;
+  };
+  server.getDrillJson = [] { return juce::String (R"({"type":"drill","state":"playing","bpm":60})"); };
+  server.onDrillDisconnect = [&disconnected] { disconnected = true; };
+  sendTestText (client, R"({"type":"drill_command","action":"start","pattern":"RLK","spacing":2,"bpm":60})");
+  juce::MessageManager::getInstance ()->runDispatchLoopUntil (250);
+  assert (received);
+  char bytes[8192]{};
+  int count = client.read (bytes, sizeof (bytes), false);
+  assert (count > 0);
+  const std::string replies (bytes, static_cast<size_t> (count));
+  assert (replies.find ("drill_ack") != std::string::npos);
+  assert (replies.find ("playing") != std::string::npos);
+  // Refresh uses the same server state and must not deadlock under the client mutex.
+  sendTestText (client, R"({"type":"get_state"})");
+  juce::MessageManager::getInstance ()->runDispatchLoopUntil (150);
+  const uint8_t closeFrame[]{0x88, 0x80, 0, 0, 0, 0};
+  client.write (closeFrame, sizeof (closeFrame));
+  juce::MessageManager::getInstance ()->runDispatchLoopUntil (250);
+  assert (disconnected);
+  server.onDrillCommand = {};
+  server.onDrillDisconnect = {};
+  std::cout << " PASSED" << std::endl;
+}
+
 int main (int argc, char *argv[]) {
   juce::ScopedJuceInitialiser_GUI juceInit;
 
@@ -182,6 +221,8 @@ int main (int argc, char *argv[]) {
     assert (std::abs (currentBpm - 145.0f) < 0.2f);
   }
   std::cout << " PASSED" << std::endl;
+
+  testDrillProtocol (server, clientSocket);
 
   // ── Cleanup ─────────────────────────────────────────────────────
   clientSocket.close ();

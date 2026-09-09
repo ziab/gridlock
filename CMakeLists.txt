@@ -48,6 +48,9 @@ target_sources(MidiGridAnalyzer PRIVATE
     plugin/ClickGenerator.cpp
     plugin/RemoteControlServer.h
     plugin/RemoteControlServer.cpp
+    plugin/DrillEngine.h
+    plugin/DrillHistory.h
+    plugin/DrillPanel.h
     plugin/PluginProcessor.h
     plugin/PluginProcessor.cpp
     plugin/GridComponent.h
@@ -116,6 +119,9 @@ target_sources(LogicTests PRIVATE
     plugin/Theme.h
     plugin/ClickGenerator.h
     plugin/ClickGenerator.cpp
+    plugin/DrillEngine.h
+    plugin/DrillHistory.h
+    plugin/DrillPanel.h
     plugin/PluginProcessor.h
     plugin/PluginProcessor.cpp
     plugin/EditorLookAndFeel.h
@@ -124,6 +130,7 @@ target_sources(LogicTests PRIVATE
     plugin/RemoteControlServer.h
     plugin/RemoteControlServer.cpp
     plugin/EditorPreview.h
+    plugin/DrillTests.h
     plugin/LogicTests.cpp
 )
 

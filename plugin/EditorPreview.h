@@ -1,3 +1,4 @@
+#include "DrillPanel.h"
 #pragma once
 
 #include "PluginEditor.h"
@@ -89,7 +90,38 @@ struct EditorPreview {
       }
       stream->truncate ();
     }
+    const bool drillRendered = renderDrill (processor, directory);
     processor.releaseResources ();
+    return drillRendered;
+  }
+  static bool renderDrill (MidiGridAnalyzerAudioProcessor &processor, const juce::File &directory) {
+    processor.remoteServer.reset ();
+    DrillPanel panel (processor);
+    panel.createComponentSnapshot (panel.getLocalBounds ());
+    juce::MessageManager::getInstance ()->runDispatchLoopUntil (120);
+    for (int state = 0; state < 2; ++state) {
+      if (state == 1) {
+        auto &v = processor.drill.view;
+        v.config.length = 6;
+        juce::String ("RLRLKK").copyToUTF8 (v.config.pattern.data (), v.config.pattern.size ());
+        v.state = DrillEngine::State::Playing;
+        v.bpm = 84;
+        v.best = 81;
+        v.activeSlot = 3;
+        v.passes = 1;
+        v.progress = 0.65;
+        v.accuracy = 0.96;
+        v.nextBpm = 87;
+        processor.publishDrillSnapshot ();
+        juce::MessageManager::getInstance ()->runDispatchLoopUntil (120);
+      }
+      auto image = panel.createComponentSnapshot (panel.getLocalBounds ());
+      auto stream = directory.getChildFile (state == 0 ? "drill-setup.png" : "drill-live.png").createOutputStream ();
+      if (!stream || !stream->setPosition (0) || !juce::PNGImageFormat ().writeImageToStream (image, *stream)) {
+        return false;
+      }
+      stream->truncate ();
+    }
     return true;
   }
 };

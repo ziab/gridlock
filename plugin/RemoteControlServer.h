@@ -37,7 +37,13 @@ public:
   void setCalibrationCallbacks (std::function<void ()> onCalibrate, std::function<void (bool)> onApply,
                                 std::function<void ()> onCancel, std::function<juce::String ()> getCalibJson);
 
+  std::function<bool (const juce::var &)> onDrillCommand;
+  std::function<juce::String ()> getDrillJson;
+  std::function<bool ()> drillIsActive;
+  std::function<void ()> onDrillDisconnect;
+
 private:
+  bool hadDrillClients{false};
   // ── Thread (WebSocket accept loop) ──────────────────────────────
   void run () override;
 
@@ -65,6 +71,7 @@ private:
 
   struct ConnectedClient {
     std::unique_ptr<juce::StreamingSocket> socket;
+    double lastHeardMs{juce::Time::getMillisecondCounterHiRes ()};
   };
   std::vector<ConnectedClient> clients;
   std::mutex clientsMutex;

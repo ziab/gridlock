@@ -51,6 +51,14 @@ MidiGridAnalyzerAudioProcessor::MidiGridAnalyzerAudioProcessor ()
     remoteServer->setCalibrationCallbacks (
         [this] { startCalibration (); }, [this] (bool add) { applyCalibrationResult (add); },
         [this] { cancelCalibration (); }, [this] { return getCalibrationStateJson (); });
+    remoteServer->onDrillCommand = [this] (const juce::var &message) { return drillCommand (message); };
+    remoteServer->drillIsActive = [this] { return isDrillActive (); };
+    remoteServer->getDrillJson = [this] { return getDrillStateJson (); };
+    remoteServer->onDrillDisconnect = [this] {
+      juce::DynamicObject::Ptr message = new juce::DynamicObject ();
+      message->setProperty ("action", "disconnect");
+      drillCommand (juce::var (message.get ()));
+    };
     remoteServer->start ();
   }
 }
@@ -188,6 +196,10 @@ void MidiGridAnalyzerAudioProcessor::prepareToPlay (double sampleRate, int sampl
     deviceInputLatencySamples.store (0);
   }
   internalPpqPosition = 0.0;
+  if (drill.active ()) {
+    drill.command (DrillEngine::Action::Pause, drill.view.config, 0);
+    publishDrillSnapshot ();
+  }
   lastTestBeatTick = -1.0;
   ringBuffer.reset ();
   clickGenerator.prepareToPlay (sampleRate);
@@ -202,12 +214,22 @@ bool MidiGridAnalyzerAudioProcessor::isBusesLayoutSupported (const BusesLayout &
   return true;
 }
 
-void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages) {
+void MidiGridAnalyzerAudioProcessor::processAudioChunk (juce::AudioBuffer<float> &buffer,
+                                                        juce::MidiBuffer &midiMessages) {
   buffer.clear ();
 
   const double sampleRate = getSampleRate ();
   const int numSamples = buffer.getNumSamples ();
-  const ParamSnapshot p = readSnapshot (apvts);
+  ParamSnapshot p = readSnapshot (apvts);
+  if (drill.active ()) {
+    p.internalBpm = static_cast<float> (drill.view.bpm);
+    p.timeSigNum = drill.view.config.beats;
+    p.isPaused = !drill.running ();
+    p.clickEnabled = true;
+    p.clickSubChoice = 1;
+    p.testMode = false;
+    p.minVelocity = drill.view.config.minVelocity;
+  }
   const double gridInterval = getSubdivisionPpq (p.subChoice);
 
   updateHostSyncAndPlayhead (p.internalBpm, p.timeSigNum, p.isPaused);
@@ -227,7 +249,8 @@ void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buf
   const double autoLatencyMs = (static_cast<double> (getLatencySamples ()) / srToUse) * 1000.0;
   const double deviceLatencyMs = getDeviceLatencyMs (srToUse);
   const double userLatencyMs = static_cast<double> (p.userLatencyMs);
-  const double totalLatencyMs = autoLatencyMs + deviceLatencyMs + userLatencyMs;
+  const double totalLatencyMs =
+      drill.active () ? drill.view.config.latencyMs : autoLatencyMs + deviceLatencyMs + userLatencyMs;
   const double totalLatencyPpq = (totalLatencyMs / 1000.0) * (currentBpm / 60.0);
   // For calibration: measure absolute offset EXCLUDING current user latency
   // (so result can replace, not add). Use snapshot calibBpm if calibrating.
@@ -257,7 +280,7 @@ void MidiGridAnalyzerAudioProcessor::updateHostSyncAndPlayhead (float internalBp
   int hostTimeSigNum = timeSigNumVal;
   bool hostPlaying = false;
 
-  if (auto playHead = getPlayHead ()) {
+  if (auto playHead = isStandaloneMode ? nullptr : getPlayHead ()) {
     if (auto pos = playHead->getPosition ()) {
       if (auto bpmOpt = pos->getBpm ()) {
         if (*bpmOpt > 0.0) {
@@ -308,6 +331,9 @@ void MidiGridAnalyzerAudioProcessor::processIncomingMidi (const juce::MidiBuffer
                                                           double totalLatencyPpq, double calibLatencyPpq) {
   const bool isCalibRec = (calibState.load () == static_cast<int> (CalibState::Recording));
   for (const auto metadata : midiMessages) {
+    if (metadata.samplePosition < drillMidiOffset || metadata.samplePosition >= drillMidiOffset + drillMidiCount) {
+      continue;
+    }
     const auto msg = metadata.getMessage ();
     if (!(msg.isNoteOn () && msg.getVelocity () >= minVelocity &&
           !DrumMap::isExcluded (static_cast<uint8_t> (msg.getNoteNumber ()))))
@@ -321,9 +347,12 @@ void MidiGridAnalyzerAudioProcessor::processIncomingMidi (const juce::MidiBuffer
       continue;
     }
 
-    const int sampleOffset = metadata.samplePosition;
+    const int sampleOffset = metadata.samplePosition - drillMidiOffset;
     const double rawHitPpq = currentPpqPosition + (sampleOffset * (currentBpm / 60.0) / srToUse);
     const double compensatedHitPpq = rawHitPpq - totalLatencyPpq;
+    if (drill.active ()) {
+      drill.hit (compensatedHitPpq, noteNum);
+    }
     const auto timing = Timing::compute (compensatedHitPpq, gridInterval, currentBpm, toleranceMs);
 
     HitEvent event;
@@ -439,6 +468,9 @@ void MidiGridAnalyzerAudioProcessor::generateTestModeBeat (double blockStartPpq,
 
 // ── Calibration wizard ──
 void MidiGridAnalyzerAudioProcessor::startCalibration () {
+  if (isDrillActive ()) {
+    return;
+  }
   const ParamSnapshot p = readSnapshot (apvts);
   const double effectiveIntervalForCalib = getEffectiveGridInterval (p);
   if (effectiveIntervalForCalib <= 0.0 || p.timeSigNum <= 0 || currentBpm <= 0.0) {
@@ -700,4 +732,187 @@ void MidiGridAnalyzerAudioProcessor::setStateInformation (const void *data, int 
 
 juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter () {
   return new MidiGridAnalyzerAudioProcessor ();
+}
+
+void MidiGridAnalyzerAudioProcessor::consumeDrillCommand () {
+  std::unique_lock<std::mutex> lock (drillMutex, std::try_to_lock);
+  if (!lock.owns_lock ()) {
+    return;
+  }
+  while (drillCommandRead != drillCommandWrite) {
+    const auto &command = drillCommands[static_cast<size_t> (drillCommandRead)];
+    drill.command (command.action, command.config, internalPpqPosition);
+    drillCommandRead = (drillCommandRead + 1) % static_cast<int> (drillCommands.size ());
+  }
+}
+
+void MidiGridAnalyzerAudioProcessor::publishDrillSnapshot () {
+  std::unique_lock<std::mutex> lock (drillMutex, std::try_to_lock);
+  if (lock.owns_lock ()) {
+    drillSnapshot = drill.view;
+  }
+}
+
+void MidiGridAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages) {
+  consumeDrillCommand ();
+  drillMidiOffset = 0;
+  drillMidiCount = buffer.getNumSamples ();
+  if (!drill.active ()) {
+    processAudioChunk (buffer, midiMessages);
+    publishDrillSnapshot ();
+    return;
+  }
+  const double sr = getSampleRate () > 0 ? getSampleRate () : constants::params::sampleRateFallback;
+  int offset = 0;
+  while (offset < buffer.getNumSamples ()) {
+    const double latencyPpq = drill.view.config.latencyMs * drill.view.bpm / 60000.0;
+    drill.advance (internalPpqPosition, internalPpqPosition - latencyPpq);
+    int count = buffer.getNumSamples () - offset;
+    if (drill.running () && std::isfinite (drill.nextBoundary ())) {
+      const double distance = (drill.nextBoundary () - internalPpqPosition) * sr * 60.0 / drill.view.bpm;
+      count = std::min (count, std::max (1, static_cast<int> (std::ceil (distance - 1e-9))));
+    }
+    juce::AudioBuffer<float> chunk (buffer.getArrayOfWritePointers (), buffer.getNumChannels (), offset, count);
+    drillMidiOffset = offset;
+    drillMidiCount = count;
+    processAudioChunk (chunk, midiMessages);
+    drill.advance (internalPpqPosition, internalPpqPosition - latencyPpq);
+    offset += count;
+  }
+  publishDrillSnapshot ();
+}
+
+DrillEngine::Snapshot MidiGridAnalyzerAudioProcessor::getDrillSnapshot () const {
+  std::lock_guard<std::mutex> lock (drillMutex);
+  return drillSnapshot;
+}
+
+bool MidiGridAnalyzerAudioProcessor::isDrillActive () const {
+  std::lock_guard<std::mutex> lock (drillMutex);
+  return drillSessionRequested;
+}
+
+bool MidiGridAnalyzerAudioProcessor::parseDrillConfig (const juce::var &message, DrillEngine::Config &config) const {
+  const auto pattern = message["pattern"].toString ().removeCharacters (" \t\r\n").toUpperCase ();
+  if (pattern.isEmpty () || pattern.length () > constants::drill::maxPattern || !pattern.containsOnly ("RLK")) {
+    return false;
+  }
+  if (!message.hasProperty ("spacing") || !message.hasProperty ("bpm")) {
+    return false;
+  }
+  const int spacing = static_cast<int> (message["spacing"]);
+  const double bpm = static_cast<double> (message["bpm"]);
+  const int kick = message.hasProperty ("kick") ? static_cast<int> (message["kick"]) : DrumMap::Kick;
+  if (spacing < 0 || spacing > 2 || static_cast<double> (message["spacing"]) != spacing || !std::isfinite (bpm) ||
+      bpm < constants::params::bpmMin || bpm > constants::params::bpmMax || kick < 0 || kick > 127 ||
+      kick == DrumMap::PedalHiHat) {
+    return false;
+  }
+  if (message.hasProperty ("kick") && static_cast<double> (message["kick"]) != kick) {
+    return false;
+  }
+  config.length = pattern.length ();
+  pattern.copyToUTF8 (config.pattern.data (), config.pattern.size ());
+  config.bpm = bpm;
+  config.kick = kick;
+  config.interval = spacing == 0   ? constants::musical::ppq_1_8
+                    : spacing == 1 ? constants::musical::ppq_1_8T
+                                   : constants::musical::ppq_1_16;
+  const auto params = readSnapshot (apvts);
+  config.beats = params.timeSigNum;
+  config.minVelocity = params.minVelocity;
+  config.tolerance = message.hasProperty ("tolerance") ? static_cast<float> (message["tolerance"])
+                                                       : constants::params::toleranceDefault;
+  if (!std::isfinite (config.tolerance) || config.tolerance < constants::params::toleranceMin ||
+      config.tolerance > constants::params::toleranceMax) {
+    return false;
+  }
+  const double sr = getSampleRate () > 0 ? getSampleRate () : constants::params::sampleRateFallback;
+  config.latencyMs = params.userLatencyMs + getDeviceLatencyMs (sr) + getLatencySamples () * 1000.0 / sr;
+  return true;
+}
+
+bool MidiGridAnalyzerAudioProcessor::drillCommand (const juce::var &message) {
+  if (!isStandaloneMode) {
+    return false;
+  }
+  const auto action = message["action"].toString ();
+  DrillCommand command{DrillEngine::Action::Start, {}};
+  if (action == "start") {
+    if (!parseDrillConfig (message, command.config)) {
+      return false;
+    }
+  } else if (action == "hold") {
+    command.action = DrillEngine::Action::Hold;
+  } else if (action == "too_fast") {
+    command.action = DrillEngine::Action::TooFast;
+  } else if (action == "pause") {
+    command.action = DrillEngine::Action::Pause;
+  } else if (action == "resume") {
+    command.action = DrillEngine::Action::Resume;
+  } else if (action == "retry") {
+    command.action = DrillEngine::Action::Retry;
+  } else if (action == "finish") {
+    command.action = DrillEngine::Action::Finish;
+  } else if (action == "disconnect") {
+    command.action = DrillEngine::Action::Disconnect;
+  } else {
+    return false;
+  }
+  {
+    std::lock_guard<std::mutex> lock (drillMutex);
+    if ((action == "start") == drillSessionRequested) {
+      return false;
+    }
+    const int next = (drillCommandWrite + 1) % static_cast<int> (drillCommands.size ());
+    if (next == drillCommandRead) {
+      return false;
+    }
+    drillCommands[static_cast<size_t> (drillCommandWrite)] = command;
+    drillCommandWrite = next;
+    if (action == "start") {
+      drillSessionRequested = true;
+    }
+    if (action == "finish") {
+      drillSessionRequested = false;
+    }
+  }
+  if (action == "start") {
+    cancelCalibration ();
+  }
+  if (action == "finish") {
+    apvts.getParameter ("click_enabled")->setValueNotifyingHost (0);
+    auto *bpm = apvts.getParameter ("internal_bpm");
+    bpm->setValueNotifyingHost (bpm->convertTo0to1 (static_cast<float> (getDrillSnapshot ().bpm)));
+  }
+  return true;
+}
+
+juce::String MidiGridAnalyzerAudioProcessor::getDrillStateJson () {
+  const auto s = getDrillSnapshot ();
+  juce::DynamicObject::Ptr obj = new juce::DynamicObject ();
+  const char *states[] = {"idle", "countin", "playing", "paused", "finished"};
+  obj->setProperty ("type", "drill");
+  obj->setProperty ("history", drillHistory.updateAndCopy (s));
+  obj->setProperty ("state", states[static_cast<int> (s.state)]);
+  obj->setProperty ("pattern", juce::String (s.config.pattern.data ()));
+  obj->setProperty ("bpm", s.bpm);
+  obj->setProperty ("best", s.best);
+  obj->setProperty ("attempted", s.attempted);
+  obj->setProperty ("nextBpm", s.nextBpm);
+  obj->setProperty ("progress", s.progress);
+  obj->setProperty ("accuracy", s.accuracy);
+  obj->setProperty ("passes", s.passes);
+  obj->setProperty ("blocks", s.blocks);
+  obj->setProperty ("activeSlot", s.activeSlot);
+  obj->setProperty ("beatsRemaining", s.beatsRemaining);
+  obj->setProperty ("missing", s.missing);
+  obj->setProperty ("wrong", s.wrong);
+  obj->setProperty ("late", s.late);
+  obj->setProperty ("extras", s.extras);
+  obj->setProperty ("automatic", s.automatic);
+  obj->setProperty ("noHits", s.noHits);
+  obj->setProperty ("limitReached", s.limitReached);
+  obj->setProperty ("tolerance", s.toleranceMs);
+  return juce::JSON::toString (juce::var (obj.get ()));
 }

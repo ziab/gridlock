@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ClickGenerator.h"
+#include "DrillEngine.h"
+#include "DrillHistory.h"
 #include "HitEvent.h"
 #include "RemoteControlServer.h"
 #include "RingBuffer.h"
@@ -139,7 +141,30 @@ public:
   double getCalibrationProgress () const noexcept;
   juce::String getCalibrationStateJson () const;
 
+  bool isDrillActive () const;
+  bool drillCommand (const juce::var &message);
+  juce::String getDrillStateJson ();
+  DrillHistory drillHistory;
+  DrillEngine::Snapshot getDrillSnapshot () const;
+
 private:
+  friend class DrillProcessorTests;
+  friend struct EditorPreview;
+  bool parseDrillConfig (const juce::var &, DrillEngine::Config &) const;
+  bool drillSessionRequested{false};
+  void processAudioChunk (juce::AudioBuffer<float> &, juce::MidiBuffer &);
+  void consumeDrillCommand ();
+  void publishDrillSnapshot ();
+  DrillEngine drill;
+  int drillMidiOffset{0}, drillMidiCount{0};
+  mutable std::mutex drillMutex;
+  DrillEngine::Snapshot drillSnapshot;
+  struct DrillCommand {
+    DrillEngine::Action action;
+    DrillEngine::Config config;
+  };
+  std::array<DrillCommand, 16> drillCommands{};
+  int drillCommandRead{0}, drillCommandWrite{0};
   void updateHostSyncAndPlayhead (float internalBpmVal, int timeSigNumVal, bool isPausedVal);
   void processIncomingMidi (const juce::MidiBuffer &midiMessages, double srToUse, double gridInterval,
                             float toleranceMs, int minVelocity, double totalLatencyPpq, double calibLatencyPpq);

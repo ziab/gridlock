@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_colors.dart';
+import 'drill_screen.dart';
 import '../constants/app_constants.dart';
 import '../models/parameter.dart';
 import '../services/connection_service.dart';
@@ -32,11 +33,14 @@ class _ControlScreenState extends State<ControlScreen>
   String? _errorMessage;
   late AnimationController _pulseController;
   late PracticeTimerService _practiceTimerService;
+  late ConnectionService _connection;
 
   @override
   void initState() {
     super.initState();
     _practiceTimerService = PracticeTimerService();
+    _connection = context.read<ConnectionService>();
+    _connection.addListener(_onConnectionChanged);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -44,9 +48,16 @@ class _ControlScreenState extends State<ControlScreen>
     _startDiscovery();
   }
 
+  void _onConnectionChanged() {
+    if (_connection.drill.active && _practiceTimerService.isPracticing) {
+      _practiceTimerService.stopPractice();
+    }
+  }
+
   @override
   void dispose() {
     _pulseController.dispose();
+    _connection.removeListener(_onConnectionChanged);
     _practiceTimerService.dispose();
     super.dispose();
   }
@@ -1045,10 +1056,17 @@ class _ControlScreenState extends State<ControlScreen>
       ),
       child: Row(
         children: [
+          if (connection.drillSupported)
+            IconButton(tooltip: 'Grouping Drill', icon: const Icon(Icons.repeat, color: AppColors.emerald),
+              onPressed: () {
+                timerService.stopPractice();
+                Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const DrillScreen()));
+              }),
           // Practice Mode Button
           GestureDetector(
             onTap: () {
               HapticFeedback.mediumImpact();
+              if (connection.drill.active) return;
               _showPracticeSetupModal(
                 context,
                 connection,

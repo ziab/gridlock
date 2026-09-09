@@ -1,3 +1,4 @@
+#include "DrillTests.h"
 #include "AsciiTabRenderer.h"
 #include "ClickGenerator.h"
 #include "Crypto.h"

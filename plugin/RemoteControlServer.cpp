@@ -156,6 +156,7 @@ void RemoteControlServer::timerCallback () {
         juce::String msg = readWebSocketTextFrame (sock);
 
         if (msg.isNotEmpty ()) {
+          it->lastHeardMs = juce::Time::getMillisecondCounterHiRes ();
           handleClientMessage (sock, msg);
         } else if (!sock.isConnected ()) {
           it = clients.erase (it);
@@ -165,6 +166,22 @@ void RemoteControlServer::timerCallback () {
 
       ++it;
     }
+  }
+
+  bool connected = false;
+  {
+    std::lock_guard<std::mutex> lock (clientsMutex);
+    const double now = juce::Time::getMillisecondCounterHiRes ();
+    connected = std::any_of (clients.begin (), clients.end (), [now] (const auto &client) {
+      return now - client.lastHeardMs < constants::drill::heartbeatTimeoutMs;
+    });
+  }
+  if (hadDrillClients && !connected && onDrillDisconnect) {
+    onDrillDisconnect ();
+  }
+  hadDrillClients = connected;
+  if (getDrillJson) {
+    broadcastToClients (getDrillJson ());
   }
 
   // 2. Detect parameter changes and push to clients
@@ -380,7 +397,7 @@ bool RemoteControlServer::sendWebSocketTextFrame (juce::StreamingSocket &client,
 // ─────────────────────────────────────────────────────────────────────────────
 // Handle incoming client JSON message
 // ─────────────────────────────────────────────────────────────────────────────
-void RemoteControlServer::handleClientMessage (juce::StreamingSocket & /*client*/, const juce::String &message) {
+void RemoteControlServer::handleClientMessage (juce::StreamingSocket &client, const juce::String &message) {
   auto parsed = juce::JSON::parse (message);
   if (!parsed.isObject ()) {
     return;
@@ -393,9 +410,23 @@ void RemoteControlServer::handleClientMessage (juce::StreamingSocket & /*client*
 
   juce::String type = obj->getProperty ("type").toString ();
 
+  if (type == "drill_command") {
+    const bool accepted = onDrillCommand && onDrillCommand (parsed);
+    sendWebSocketTextFrame (
+        client,
+        accepted
+            ? "{\"type\":\"drill_ack\",\"accepted\":true}"
+            : "{\"type\":\"drill_ack\",\"accepted\":false,\"error\":\"Invalid drill settings or drill unavailable\"}");
+    return;
+  }
   if (type == "set") {
     juce::String paramId = obj->getProperty ("id").toString ();
     double value = obj->getProperty ("value");
+    const juce::StringArray owned{"internal_bpm",      "time_sig_num", "is_paused", "click_enabled",
+                                  "latency_offset_ms", "min_velocity", "test_mode", "tolerance_ms"};
+    if (drillIsActive && drillIsActive () && owned.contains (paramId)) {
+      return;
+    }
 
     if (auto *param = apvts.getParameter (paramId)) {
       float normalized = param->convertTo0to1 (static_cast<float> (value));
@@ -406,14 +437,15 @@ void RemoteControlServer::handleClientMessage (juce::StreamingSocket & /*client*
   } else if (type == "get_state") {
     // Client requests full state refresh
     juce::String stateJson = buildFullStateJson ();
-    std::lock_guard<std::mutex> lock (clientsMutex);
     // Send to all clients (broadcast)
     for (auto &c : clients) {
       sendWebSocketTextFrame (*c.socket, stateJson);
     }
   } else if (type == "clear_grid") {
     // Acknowledge clear grid request to clients
-    broadcastToClients ("{\"type\":\"clear_ack\"}");
+    for (auto &c : clients) {
+      sendWebSocketTextFrame (*c.socket, "{\"type\":\"clear_ack\"}");
+    }
   } else if (type == "calibrate") {
     if (onCalibrate) {
       onCalibrate ();

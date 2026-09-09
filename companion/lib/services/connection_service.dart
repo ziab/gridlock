@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/parameter.dart';
+import '../models/drill_state.dart';
 import '../utils/net_utils.dart';
 
 /// Manages the WebSocket connection to the Gridlock JUCE standalone app.
@@ -12,6 +13,7 @@ import '../utils/net_utils.dart';
 class ConnectionService extends ChangeNotifier {
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
+  Timer? _drillHeartbeat;
 
   bool _connected = false;
   String? _serverIp;
@@ -24,6 +26,19 @@ class ConnectionService extends ChangeNotifier {
 
   /// All parameters received from the server.
   final Map<String, RemoteParameter> parameters = {};
+
+  Map<String, double> drillHistory = {};
+  DrillState drill = const DrillState();
+  String? drillError;
+  bool drillSupported = false;
+  void drillCommand(String action, {Map<String, Object> settings = const {}}) {
+    if (!_connected || _channel == null) return;
+    drillError = null;
+    _channel!.sink.add(
+      jsonEncode({'type': 'drill_command', 'action': action, ...settings}),
+    );
+    notifyListeners();
+  }
 
   /// Connect to the Gridlock server at the given address.
   Future<bool> connect(String ip, int port) async {
@@ -38,6 +53,9 @@ class ConnectionService extends ChangeNotifier {
       _serverIp = cleaned;
       _serverPort = port;
       _connected = true;
+      _drillHeartbeat = Timer.periodic(const Duration(seconds: 2), (_) {
+        _channel?.sink.add(jsonEncode({'type': 'drill_heartbeat'}));
+      });
 
       _subscription = _channel!.stream.listen(
         _onMessage,
@@ -79,6 +97,18 @@ class ConnectionService extends ChangeNotifier {
 
   /// Send a parameter update command to the server.
   void setParameter(String id, double value) {
+    if (drill.active &&
+        {
+          'internal_bpm',
+          'time_sig_num',
+          'is_paused',
+          'click_enabled',
+          'latency_offset_ms',
+          'min_velocity',
+          'test_mode',
+        }.contains(id)) {
+      return;
+    }
     if (!_connected || _channel == null) return;
 
     final msg = jsonEncode({'type': 'set', 'id': id, 'value': value});
@@ -112,7 +142,9 @@ class ConnectionService extends ChangeNotifier {
 
   void applyCalibration({bool addToExisting = false}) {
     if (!_connected || _channel == null) return;
-    _channel!.sink.add(jsonEncode({'type': 'calibration_apply', 'add': addToExisting}));
+    _channel!.sink.add(
+      jsonEncode({'type': 'calibration_apply', 'add': addToExisting}),
+    );
   }
 
   void cancelCalibration() {
@@ -153,6 +185,21 @@ class ConnectionService extends ChangeNotifier {
           break;
         case 'changed':
           _handleParamChanged(json);
+          break;
+        case 'drill':
+          drillSupported = true;
+          final history = json['history'] as Map<String, dynamic>? ?? {};
+          drillHistory = history.map(
+            (key, value) => MapEntry(key, (value as num).toDouble()),
+          );
+          drill = DrillState.fromJson(json);
+          notifyListeners();
+          break;
+        case 'drill_ack':
+          drillError = json['accepted'] == true
+              ? null
+              : json['error'] as String? ?? 'Drill command rejected';
+          notifyListeners();
           break;
         case 'calibration':
           _handleCalibration(json);
@@ -232,7 +279,10 @@ class ConnectionService extends ChangeNotifier {
   }
 
   void _handleDisconnect() {
+    _drillHeartbeat?.cancel();
+    _drillHeartbeat = null;
     _connected = false;
+    drillSupported = false;
     _serverIp = null;
     _serverPort = null;
     notifyListeners();

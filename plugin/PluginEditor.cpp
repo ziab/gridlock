@@ -1,6 +1,7 @@
 #include "PluginEditor.h"
 
 #include "AsciiTabRenderer.h"
+#include "DrillPanel.h"
 #include "PluginProcessor.h"
 #include "Theme.h"
 
@@ -100,6 +101,22 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
   attachParameters ();
   setupTimeSigHandling ();
   setupDesktopLayout ();
+  addAndMakeVisible (drillButton);
+  drillButton.setEnabled (processorRef.isStandaloneAppMode ());
+  drillButton.onClick = [this] {
+    if (drillWindow != nullptr) {
+      drillWindow->toFront (true);
+      return;
+    }
+    juce::DialogWindow::LaunchOptions options;
+    options.content.setOwned (new DrillPanel (processorRef));
+    options.dialogTitle = "Grouping Drill";
+    options.dialogBackgroundColour = Theme::col (Theme::bgMain);
+    options.escapeKeyTriggersCloseButton = true;
+    options.useNativeTitleBar = true;
+    options.resizable = true;
+    drillWindow = options.launchAsync ();
+  };
   resized ();
 
   openGLContext.attachTo (*this);
@@ -221,6 +238,7 @@ void MidiGridAnalyzerAudioProcessorEditor::setupTimeSigHandling () {
 }
 
 MidiGridAnalyzerAudioProcessorEditor::~MidiGridAnalyzerAudioProcessorEditor () {
+  delete drillWindow.getComponent ();
   // Don't query peer here — top-level may already be detached (returns false and
   // would overwrite a previously saved maximized=true). Persist last known state.
   if (processorRef.isStandaloneAppMode () && windowStateRestored) {
@@ -436,6 +454,13 @@ GridViewState MidiGridAnalyzerAudioProcessorEditor::buildGridViewState (int bars
   const double sr = processorRef.getSampleRate ();
   s.deviceLatencyMs = static_cast<float> (processorRef.getDeviceLatencyMs (sr > 0.0 ? sr : 44100.0));
   s.bpm = static_cast<float> (processorRef.getCurrentBpm ());
+  const auto d = processorRef.getDrillSnapshot ();
+  if (d.state != DrillEngine::State::Idle && d.state != DrillEngine::State::Finished) {
+    s.gridSubdivisionPpq = s.effectiveInterval = d.config.interval;
+    s.toleranceMs = static_cast<float> (d.toleranceMs);
+    s.latencyOffsetMs = static_cast<float> (d.config.latencyMs);
+    s.deviceLatencyMs = 0;
+  }
   return s;
 }
 
@@ -461,6 +486,7 @@ void MidiGridAnalyzerAudioProcessorEditor::timerCallback () {
   }
   updateDeviceLatency ();
   updateCalibrationUI ();
+  updateDrillUI ();
   drainRingBuffer ();
 
   const double currentPpq = processorRef.getCurrentPpqPosition ();
@@ -654,7 +680,8 @@ void MidiGridAnalyzerAudioProcessorEditor::paint (juce::Graphics &g) {
 
 void MidiGridAnalyzerAudioProcessorEditor::layoutPracticeControls () {
   brandLabel.setBounds (20, 18, 155, 28);
-  practiceLabel.setBounds (20, 46, 160, 18);
+  practiceLabel.setVisible (false);
+  drillButton.setBounds (20, 47, 155, 26);
   bpmSlider.setBounds (190, 30, 142, 42);
   bpmLabel.setBounds (190, 8, 142, 20);
   timeSigComboBox.setBounds (350, 30, 96, kControlHeight);
@@ -716,4 +743,23 @@ void MidiGridAnalyzerAudioProcessorEditor::resized () {
   gridComponent.setBounds (0, kHeaderHeight, getWidth () - (settingsOpen ? kSettingsWidth : 0),
                            getHeight () - kHeaderHeight);
   calibCountOverlay.setBounds (gridComponent.getBounds ().withSizeKeepingCentre (240, 120));
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::updateDrillUI () {
+  const auto s = processorRef.getDrillSnapshot ();
+  const bool active = s.state != DrillEngine::State::Idle && s.state != DrillEngine::State::Finished;
+  for (auto *control :
+       std::array<juce::Component *, 9>{&bpmSlider, &timeSigComboBox, &pauseButton, &clickToggleButton, &latencySlider,
+                                        &velocitySlider, &testButton, &calibrateButton, &toleranceSlider}) {
+    control->setEnabled (!active);
+  }
+  if (active) {
+    bpmSlider.setValue (s.bpm, juce::dontSendNotification);
+    drillButton.setButtonText ("Drill: " + juce::String (s.bpm, 0) + " BPM");
+  } else if (wasDrilling) {
+    bpmSlider.setValue (processorRef.getAPVTS ().getRawParameterValue ("internal_bpm")->load (),
+                        juce::dontSendNotification);
+    drillButton.setButtonText ("Grouping Drill");
+  }
+  wasDrilling = active;
 }

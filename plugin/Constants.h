@@ -61,6 +61,27 @@ constexpr std::array<double, 3> candidatesAuto = {ppq_1_16, ppq_1_32, ppq_1_64};
 } // namespace musical
 
 // ── Network ──
+namespace drill {
+constexpr int maxPattern = 64;
+constexpr int minStrokes = 32;
+constexpr double minSeconds = 10.0;
+constexpr double passAccuracy = 0.95;
+constexpr double holdAccuracy = 0.85;
+constexpr double passExtras = 0.02;
+constexpr double holdExtras = 0.05;
+constexpr int requiredPasses = 2;
+constexpr int requiredStruggles = 2;
+constexpr int maxBlocks = 6;
+constexpr double bpmStep = 3.0;
+constexpr double startBpm = 60.0;
+constexpr double eighthStartBpm = 90.0;
+constexpr double resumeRatio = 0.8;
+constexpr double toleranceFraction = 0.15;
+constexpr int countInBars = 2;
+constexpr int silenceBars = 2;
+constexpr int heartbeatTimeoutMs = 5000;
+} // namespace drill
+
 namespace network {
 constexpr int wsPort = 9876;
 constexpr int udpPort = 9877;
