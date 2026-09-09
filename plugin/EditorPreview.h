@@ -111,6 +111,7 @@ struct EditorPreview {
         v.config.length = 6;
         juce::String ("RLRLKK").copyToUTF8 (v.config.pattern.data (), v.config.pattern.size ());
         v.state = DrillEngine::State::Playing;
+        v.sequenceDetected = v.sequenceSeen = true;
         v.bpm = 84;
         v.best = 81;
         v.activeSlot = 3;

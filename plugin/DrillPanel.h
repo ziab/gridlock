@@ -23,12 +23,24 @@ public:
     kick.setValue (DrumMap::Kick);
     kick.setTextValueSuffix (" kick note");
     addAndMakeVisible (tolerance);
-    tolerance.setRange (constants::params::toleranceMin, constants::params::toleranceMax, 1);
-    tolerance.setValue (constants::params::toleranceDefault);
+    tolerance.setRange (constants::params::toleranceMin, constants::params::toleranceMax,
+                        constants::params::toleranceStep);
+    tolerance.setValue (processor.getAPVTS ().getRawParameterValue ("tolerance_ms")->load ());
     tolerance.setTextValueSuffix (" ms tolerance");
+    tolerance.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 150, 24);
     pattern.onTextChange = [this] { suggestTempo (); };
     kick.onValueChange = [this] { suggestTempo (); };
-    tolerance.onValueChange = [this] { suggestTempo (); };
+    tolerance.onValueChange = [this] {
+      if (processor.isDrillActive ()) {
+        juce::DynamicObject::Ptr message = new juce::DynamicObject ();
+        message->setProperty ("action", "tolerance");
+        message->setProperty ("tolerance", tolerance.getValue ());
+        processor.drillCommand (juce::var (message.get ()));
+      } else {
+        suggestTempo ();
+      }
+    };
+    tolerance.setTooltip ("Only this drill. Changing tolerance resets tempo confirmation.");
     suggestTempo ();
     setupButton (start, "Start", "start");
     setupButton (hold, "Hold tempo", "hold");
@@ -63,7 +75,8 @@ public:
       headline.setBounds (area.removeFromTop (64));
       patternLine.setBounds (area.removeFromTop (56));
       help.setBounds (area.removeFromTop (52));
-      status.setBounds (area.removeFromTop (136));
+      tolerance.setBounds (area.removeFromTop (36));
+      status.setBounds (area.removeFromTop (110));
       layoutButtons (area);
       return;
     }
@@ -123,7 +136,7 @@ private:
   void timerCallback () override {
     const auto s = processor.getDrillSnapshot ();
     const bool active = s.state != DrillEngine::State::Idle && s.state != DrillEngine::State::Finished;
-    for (auto *control : std::array<juce::Component *, 6>{&pattern, &spacing, &bpm, &kick, &tolerance, &start}) {
+    for (auto *control : std::array<juce::Component *, 5>{&pattern, &spacing, &bpm, &kick, &start}) {
       control->setEnabled (!active);
     }
     for (auto *control : {&hold, &slower, &pause, &retry, &finish}) {
@@ -133,7 +146,9 @@ private:
       pattern.setText (juce::String (s.config.pattern.data ()), false);
       bpm.setValue (s.bpm, juce::dontSendNotification);
       kick.setValue (s.config.kick, juce::dontSendNotification);
-      tolerance.setValue (s.config.tolerance, juce::dontSendNotification);
+      if (!tolerance.isMouseButtonDown ()) {
+        tolerance.setValue (s.config.tolerance, juce::dontSendNotification);
+      }
       const int id = s.config.interval == constants::musical::ppq_1_8    ? 1
                      : s.config.interval == constants::musical::ppq_1_8T ? 2
                                                                          : 3;
@@ -141,7 +156,11 @@ private:
     }
     if (liveLayout != active) {
       liveLayout = active;
-      for (auto *control : std::array<juce::Component *, 5>{&pattern, &spacing, &bpm, &kick, &tolerance}) {
+      if (!active) {
+        tolerance.setValue (processor.getAPVTS ().getRawParameterValue ("tolerance_ms")->load (),
+                            juce::dontSendNotification);
+      }
+      for (auto *control : std::array<juce::Component *, 4>{&pattern, &spacing, &bpm, &kick}) {
         control->setVisible (!active);
       }
       headline.setVisible (active);
@@ -159,9 +178,11 @@ private:
     } else {
       auto letters = juce::String (s.config.pattern.data ());
       patternLine.setText (letters, juce::dontSendNotification);
+      patternLine.setColour (juce::Label::textColourId,
+                             Theme::col (s.sequenceDetected ? Theme::emerald : Theme::textPrimary));
       text = active ? juce::String () : letters + "   " + juce::String (s.bpm, 0) + " BPM";
       if (s.state == DrillEngine::State::Waiting) {
-        text += "Play when ready — start with " + letters.substring (0, 1);
+        text += "Play when ready — any subdivision";
       } else if (s.state == DrillEngine::State::Paused) {
         text += s.noHits ? " — No hits detected" : " — Paused";
       } else if (s.state == DrillEngine::State::Finished) {
@@ -169,6 +190,10 @@ private:
       } else {
         text += s.automatic ? " — Climbing" : " — Holding";
       }
+      if (active && s.state != DrillEngine::State::Paused) {
+        text += s.sequenceDetected ? " | Sequence detected" : s.sequenceSeen ? " | Sequence lost" : " | Listening";
+      }
+      text += "\nWindow: " + juce::String (s.toleranceMs, 1) + " ms (drill only)";
       text += "\nHighest confirmed: " + (s.best > 0 ? juce::String (s.best, 0) : "none") + " | " +
               juce::String (s.passes) + "/2 passes";
       text += " | Block " + juce::String (s.progress * 100, 0) + "%";

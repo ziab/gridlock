@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../services/connection_service.dart';
+import '../widgets/drill_tolerance.dart';
 
 class DrillScreen extends StatefulWidget {
   const DrillScreen({super.key});
@@ -18,16 +19,13 @@ class _DrillScreenState extends State<DrillScreen> {
   final _kick = TextEditingController(
     text: AppConstants.drillKickNote.toString(),
   );
-  final _tolerance = TextEditingController(
-    text: AppConstants.drillToleranceMs.toString(),
-  );
   final _form = GlobalKey<FormState>();
   int _spacing = 2;
 
   @override
   void initState() {
     super.initState();
-    for (final controller in [_pattern, _kick, _tolerance]) {
+    for (final controller in [_pattern, _kick]) {
       controller.addListener(_suggestTempo);
     }
     _suggestTempo();
@@ -35,10 +33,9 @@ class _DrillScreenState extends State<DrillScreen> {
 
   void _suggestTempo() {
     final pattern = _pattern.text.replaceAll(RegExp(r'\s'), '').toUpperCase();
-    final parsed = double.tryParse(_tolerance.text);
-    final tolerance = parsed != null && parsed.isFinite
-        ? parsed
-        : AppConstants.drillToleranceMs;
+    final tolerance =
+        context.read<ConnectionService>().parameters['tolerance_ms']?.value ??
+        AppConstants.drillToleranceMs;
     final key = '$pattern:$_spacing:${_kick.text}:${(tolerance * 10).round()}';
     final best = context.read<ConnectionService>().drillHistory[key];
     _bpm.text = best == null
@@ -54,7 +51,7 @@ class _DrillScreenState extends State<DrillScreen> {
 
   @override
   void dispose() {
-    for (final controller in [_pattern, _bpm, _kick, _tolerance]) {
+    for (final controller in [_pattern, _bpm, _kick]) {
       controller.dispose();
     }
     super.dispose();
@@ -104,6 +101,24 @@ class _DrillScreenState extends State<DrillScreen> {
           style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
         ),
         Text('Pattern: ${drill.pattern}', textAlign: TextAlign.center),
+        if (drill.active) ...[
+          Text(
+            drill.state == 'paused'
+                ? 'Detection paused'
+                : drill.sequenceDetected
+                ? '● Sequence detected'
+                : drill.sequenceSeen
+                ? '○ Sequence lost — listening'
+                : '○ Listening for sequence',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: drill.sequenceDetected
+                  ? AppColors.emerald
+                  : AppColors.warning,
+            ),
+          ),
+          DrillTolerance(connection: connection),
+        ],
         Text(_status(connection), textAlign: TextAlign.center),
         const SizedBox(height: 12),
         LinearProgressIndicator(value: drill.progress),
@@ -150,7 +165,7 @@ class _DrillScreenState extends State<DrillScreen> {
   String _status(ConnectionService connection) {
     final d = connection.drill;
     if (d.state == 'waiting') {
-      return 'Play when ready — start with ${d.pattern.isEmpty ? '' : d.pattern[0]}';
+      return 'Play when ready — any subdivision';
     }
     if (d.state == 'paused') {
       return d.noHits ? 'No hits detected — paused' : 'Paused';
@@ -191,12 +206,6 @@ class _DrillScreenState extends State<DrillScreen> {
     title: const Text('Advanced'),
     children: [
       _number(_kick, 'Kick MIDI note (hi-hat pedal 44 is ignored)', 0, 127),
-      _number(
-        _tolerance,
-        'Timing tolerance (ms)',
-        AppConstants.toleranceMin,
-        AppConstants.toleranceMax,
-      ),
     ],
   );
 
@@ -231,6 +240,9 @@ class _DrillScreenState extends State<DrillScreen> {
           },
         ),
         _number(_bpm, 'Start BPM', AppConstants.bpmMin, AppConstants.bpmMax),
+        Text(
+          'Drill tolerance starts at ${connection.parameters['tolerance_ms']?.value ?? AppConstants.drillToleranceMs} ms. Adjust it live after Start.',
+        ),
         _advanced(),
         const SizedBox(height: 12),
         FilledButton(
@@ -244,7 +256,9 @@ class _DrillScreenState extends State<DrillScreen> {
                       'spacing': _spacing,
                       'bpm': double.parse(_bpm.text),
                       'kick': int.tryParse(_kick.text) ?? -1,
-                      'tolerance': double.parse(_tolerance.text),
+                      'tolerance':
+                          connection.parameters['tolerance_ms']?.value ??
+                          AppConstants.drillToleranceMs,
                     },
                   );
                 }

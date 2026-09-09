@@ -9,6 +9,8 @@ public:
     testScoring ();
     testControls ();
     testFreeEntry ();
+    testDetection ();
+    testReacquisition ();
   }
 
 private:
@@ -51,6 +53,10 @@ private:
     expectEquals (e.view.nextBpm, 63.0);
     const double boundary = e.nextBoundary ();
     expectWithinAbsoluteError (std::fmod (boundary - 8, 0.75), 0.0, 1e-9);
+    for (double at = 29; at < boundary - 0.001; at += constants::musical::ppq_1_16) {
+      e.hit (at, (e.view.activeSlot + 1) % 3 == 2 ? DrumMap::Kick : DrumMap::SnareHead);
+      e.advance (at + 0.13, at + 0.13);
+    }
     e.advance (boundary - 0.001, boundary - 0.001);
     expectEquals (e.view.bpm, 60.0);
     e.advance (boundary, boundary);
@@ -141,6 +147,85 @@ private:
     expect (!e.active ());
     expectEquals (e.view.best, 60.0);
   }
+  void testReacquisition () {
+    beginTest ("All cyclic entry phases of mixed and hand-only groupings are recognized");
+    for (const auto *pattern : {"RLRLKK", "KKRL", "RLRL"}) {
+      auto c = config ();
+      const auto text = juce::String (pattern);
+      c.length = text.length ();
+      text.copyToUTF8 (c.pattern.data (), c.pattern.size ());
+      for (int phase = 0; phase < c.length; ++phase) {
+        DrillEngine e;
+        e.command (DrillEngine::Action::Start, c, 0);
+        for (int i = 0; i < c.length * 3; ++i) {
+          const auto stroke = c.pattern[static_cast<size_t> ((i + phase) % c.length)];
+          const double at = 8.25 + i * c.interval;
+          e.hit (at, stroke == 'K' ? DrumMap::Kick : DrumMap::SnareHead);
+          e.advance (at + c.interval * 0.51, at + c.interval * 0.51);
+        }
+        expect (e.view.sequenceDetected, text + " phase " + juce::String (phase));
+      }
+    }
+    beginTest ("Missing a stroke during an announced increase cancels the increase");
+    auto e = started ();
+    play (e, 0, 84);
+    expect (e.view.nextBpm > 0);
+    e.advance (29.13, 29.13);
+    expect (!e.view.sequenceDetected);
+    expectEquals (e.view.nextBpm, 0.0);
+    expectEquals (e.view.bpm, 60.0);
+  }
+  void testDetection () {
+    beginTest ("A stray hand on beat one does not lock RLK to the downbeat");
+    auto e = started ();
+    e.hit (8, DrumMap::SnareHead);
+    expect (!e.view.sequenceDetected);
+    for (int i = 0; i < 6; ++i) {
+      const double at = 8.25 + i * constants::musical::ppq_1_16;
+      e.hit (at, i % 3 == 2 ? DrumMap::Kick : DrumMap::SnareHead);
+      e.advance (at + 0.13, at + 0.13);
+    }
+    expect (e.view.sequenceDetected && e.view.sequenceSeen);
+    expectEquals (e.view.activeSlot, 2);
+
+    beginTest ("A wrong class loses detection; a full cyclic repetition recovers without restart");
+    e.hit (9.75, DrumMap::Kick);
+    expect (!e.view.sequenceDetected && e.view.sequenceSeen);
+    for (int i = 0; i < 6; ++i) {
+      const double at = 10 + i * constants::musical::ppq_1_16;
+      e.hit (at, i % 3 == 0 ? DrumMap::Kick : DrumMap::HighTom);
+      e.advance (at + 0.13, at + 0.13);
+    }
+    expect (e.view.sequenceDetected);
+    expectEquals (e.view.activeSlot, 1);
+    e.advance (11.65, 11.65);
+    expect (!e.view.sequenceDetected);
+
+    beginTest ("Triplet sequence detection uses the triplet grid across barlines");
+    auto c = config ();
+    c.interval = constants::musical::ppq_1_8T;
+    e.command (DrillEngine::Action::Start, c, 0);
+    for (int i = 0; i < 6; ++i) {
+      const double at = (11 + i) * c.interval;
+      e.hit (at, i % 3 == 2 ? DrumMap::Kick : DrumMap::SnareHead);
+      e.advance (at + c.interval * 0.51, at + c.interval * 0.51);
+    }
+    expect (e.view.sequenceDetected);
+
+    beginTest ("Tolerance updates preserve tempo and sequence but clear mixed confirmation");
+    e = started ();
+    play (e, 0, 84);
+    expect (e.view.best > 0 && e.view.nextBpm > 0);
+    c = config ();
+    c.tolerance = 35;
+    e.command (DrillEngine::Action::Tolerance, c, 29);
+    expectEquals (e.view.bpm, 60.0);
+    expectEquals (e.view.toleranceMs, 35.0);
+    expectEquals (e.view.best, 0.0);
+    expectEquals (e.view.nextBpm, 0.0);
+    expectEquals (e.view.passes, 0);
+    expect (e.view.sequenceDetected);
+  }
   void testFreeEntry () {
     beginTest ("Wait indefinitely, ignore wrong starting class, and start on any subdivision");
     auto e = started ();
@@ -202,9 +287,45 @@ public:
   void runTest () override {
     testSubdivisions ();
     testIntegration ();
+    testTolerance ();
   }
 
 private:
+  void testTolerance () {
+    beginTest ("Drill inherits main tolerance, overrides live hit colors, and leaves main setting intact");
+    MidiGridAnalyzerAudioProcessor p;
+    p.prepareToPlay (44100, 512);
+    p.isStandaloneMode = true;
+    p.setDeviceLatencySamples (0, 0);
+    auto *mainTolerance = p.apvts.getParameter ("tolerance_ms");
+    mainTolerance->setValueNotifyingHost (mainTolerance->convertTo0to1 (10));
+    expect (p.drillCommand (juce::JSON::parse (R"({"action":"start","pattern":"RLK","spacing":2,"bpm":60})")));
+    juce::AudioBuffer<float> audio (2, 512);
+    juce::MidiBuffer midi;
+    p.processBlock (audio, midi);
+    expectEquals (p.getDrillSnapshot ().config.tolerance, 10.0f);
+    expect (!p.drillCommand (juce::JSON::parse (R"({"action":"tolerance","tolerance":100})")));
+    expect (p.drillCommand (juce::JSON::parse (R"({"action":"tolerance","tolerance":35})")));
+    p.internalPpqPosition = 1.03;
+    midi.addEvent (juce::MidiMessage::noteOn (1, DrumMap::SnareHead, static_cast<juce::uint8> (100)), 0);
+    p.processBlock (audio, midi);
+    expectEquals (p.getDrillSnapshot ().toleranceMs, 35.0);
+    HitEvent hit;
+    expect (p.ringBuffer.pop (hit));
+    expect (hit.state == TimingState::OnGrid);
+    expectEquals (p.apvts.getRawParameterValue ("tolerance_ms")->load (), 10.0f);
+    const auto wire = juce::JSON::parse (p.getDrillStateJson ());
+    expectEquals (static_cast<double> (wire["toleranceOverride"]), 35.0);
+    expect (wire.hasProperty ("sequenceDetected") && wire.hasProperty ("sequenceSeen"));
+    expect (p.drillCommand (juce::JSON::parse (R"({"action":"finish"})")));
+    midi.clear ();
+    p.processBlock (audio, midi);
+    expectEquals (p.apvts.getRawParameterValue ("tolerance_ms")->load (), 10.0f);
+    expect (!p.drillCommand (juce::JSON::parse (R"({"action":"tolerance","tolerance":25})")));
+    expect (p.drillCommand (juce::JSON::parse (R"({"action":"start","pattern":"RLK","spacing":2,"bpm":60})")));
+    p.processBlock (audio, midi);
+    expectEquals (p.getDrillSnapshot ().config.tolerance, 10.0f);
+  }
   void testIntegration () {
     beginTest ("Validated commands, sample clock, MIDI pass-through and editor-independent scoring");
     MidiGridAnalyzerAudioProcessor p;

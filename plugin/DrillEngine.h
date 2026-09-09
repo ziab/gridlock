@@ -12,7 +12,7 @@
 class DrillEngine {
 public:
   enum class State { Idle, Waiting, Playing, Paused, Finished };
-  enum class Action { Start, Hold, TooFast, Pause, Resume, Finish, Retry, Disconnect };
+  enum class Action { Start, Hold, TooFast, Pause, Resume, Finish, Retry, Disconnect, Tolerance };
   struct Config {
     std::array<char, constants::drill::maxPattern + 1> pattern{};
     int length{0}, kick{DrumMap::Kick}, beats{4}, minVelocity{5};
@@ -30,6 +30,7 @@ public:
     double progress{0}, accuracy{0}, toleranceMs{20};
     int passes{0}, blocks{0}, activeSlot{0}, beatsRemaining{0};
     int correct{0}, missing{0}, wrong{0}, late{0}, extras{0}, expected{0};
+    bool sequenceDetected{false}, sequenceSeen{false};
     bool automatic{true}, noHits{false}, limitReached{false};
   };
 
@@ -56,12 +57,23 @@ public:
     if (!active ()) {
       return;
     }
+    if (action == Action::Tolerance && config.tolerance != view.config.tolerance) {
+      view.config.tolerance = config.tolerance;
+      view.best = 0;
+      view.accuracy = 0;
+      view.correct = view.missing = view.wrong = view.late = view.extras = 0;
+      pendingAt = infinity;
+      view.nextBpm = 0;
+      // Do not mix results measured with different tolerances. Keep the clock and phase.
+      beginStage (std::ceil (ppq / interval ()) * interval ());
+    }
     if (action == Action::Finish) {
       view.state = State::Finished;
       view.nextBpm = 0;
       pendingAt = infinity;
     }
     if (action == Action::Pause) {
+      view.sequenceDetected = false;
       view.state = State::Paused;
       view.nextBpm = 0;
       pendingAt = infinity;
@@ -89,6 +101,9 @@ public:
   void advance (double physicalPpq, double compensatedPpq) {
     if (!running ()) {
       return;
+    }
+    if (view.sequenceDetected && compensatedPpq > (lastSequenceTick + 1.5) * interval ()) {
+      loseSequence ();
     }
     if (physicalPpq + epsilon >= pendingAt) {
       const double boundary = pendingAt;
@@ -132,6 +147,9 @@ public:
     }
     const auto tick = static_cast<int64_t> (std::floor (compensatedPpq / interval () + 0.5));
     const bool primaryHit = tick > lastSequenceTick;
+    if (primaryHit) {
+      trackSequence (tick, note == view.config.kick);
+    }
     const bool wantsKick = view.config.pattern[static_cast<size_t> (nextStroke)] == 'K';
     if (primaryHit) {
       view.activeSlot = nextStroke;
@@ -169,6 +187,7 @@ private:
   double origin{0}, lastHit{0}, pendingAt{infinity};
   int64_t finalized{0}, lastSequenceTick{std::numeric_limits<int64_t>::min ()};
   int nextStroke{0};
+  std::array<int, constants::drill::maxPattern> matches{};
   int blockSize{32}, good{0}, missing{0}, wrong{0}, late{0}, extras{0}, struggles{0};
   double interval () const {
     return view.config.interval;
@@ -181,10 +200,45 @@ private:
                ? view.best
                : std::max<double> (constants::params::bpmMin, std::floor (view.bpm * constants::drill::resumeRatio));
   }
+  void loseSequence () {
+    if (view.sequenceDetected) {
+      pendingAt = infinity;
+      view.nextBpm = 0;
+      view.passes = 0;
+    }
+    view.sequenceDetected = false;
+  }
+  void trackSequence (int64_t tick, bool kick) {
+    // Keep every possible cyclic phase: R and L are observationally identical.
+    if (lastSequenceTick != std::numeric_limits<int64_t>::min () && tick != lastSequenceTick + 1) {
+      matches.fill (0);
+      loseSequence ();
+    }
+    const auto previous = matches;
+    int bestPhase = -1;
+    for (int phase = 0; phase < view.config.length; ++phase) {
+      const auto index = static_cast<size_t> (phase);
+      const int preceding = (phase + view.config.length - 1) % view.config.length;
+      matches[index] = (view.config.pattern[index] == 'K') == kick
+                           ? std::min (view.config.length, previous[static_cast<size_t> (preceding)] + 1)
+                           : 0;
+      if (matches[index] >= view.config.length && (bestPhase < 0 || phase == nextStroke)) {
+        bestPhase = phase;
+      }
+    }
+    if (bestPhase >= 0) {
+      nextStroke = bestPhase;
+      view.sequenceDetected = view.sequenceSeen = true;
+    } else {
+      loseSequence ();
+    }
+  }
   void waitForFirstHit (double ppq) {
     pendingAt = infinity;
     view.nextBpm = 0;
     view.noHits = false;
+    loseSequence ();
+    matches.fill (0);
     nextStroke = 0;
     lastSequenceTick = std::numeric_limits<int64_t>::min ();
     beginStage (ppq);
@@ -211,6 +265,7 @@ private:
     auto &slot = slots[static_cast<size_t> (finalized) % slots.size ()];
     if (slot.index != finalized || slot.hits == 0) {
       ++missing;
+      loseSequence ();
     } else {
       extras += slot.hits - 1;
       if (!slot.rightClass) {
@@ -231,7 +286,8 @@ private:
     view.extras = extras;
     view.accuracy = static_cast<double> (good) / blockSize;
     const double extraRate = static_cast<double> (extras) / blockSize;
-    const bool pass = view.accuracy >= constants::drill::passAccuracy && extraRate <= constants::drill::passExtras;
+    const bool pass = view.sequenceDetected && view.accuracy >= constants::drill::passAccuracy &&
+                      extraRate <= constants::drill::passExtras;
     const bool struggle = view.accuracy < constants::drill::holdAccuracy || extraRate > constants::drill::holdExtras;
     view.passes = pass ? std::min (constants::drill::requiredPasses, view.passes + 1) : 0;
     struggles = struggle ? struggles + 1 : 0;

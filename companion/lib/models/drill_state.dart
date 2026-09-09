@@ -4,9 +4,14 @@ class DrillState {
   final String state, pattern;
   final double bpm, best, attempted, nextBpm, progress, accuracy;
   final int passes, activeSlot, beatsRemaining, missing, wrong, late, extras;
-  final bool automatic, noHits, limitReached;
+  final bool automatic, noHits, limitReached, sequenceDetected, sequenceSeen;
+  final double toleranceOverride, tolerance;
 
   const DrillState({
+    this.toleranceOverride = AppConstants.drillToleranceMs,
+    this.tolerance = AppConstants.drillToleranceMs,
+    this.sequenceDetected = false,
+    this.sequenceSeen = false,
     this.state = 'idle',
     this.pattern = '',
     this.bpm = AppConstants.drillStartBpm,
@@ -32,6 +37,14 @@ class DrillState {
   factory DrillState.fromJson(Map<String, dynamic> json) {
     double number(String key) => (json[key] as num?)?.toDouble() ?? 0;
     return DrillState(
+      toleranceOverride:
+          (json['toleranceOverride'] as num?)?.toDouble() ??
+          AppConstants.drillToleranceMs,
+      tolerance:
+          (json['tolerance'] as num?)?.toDouble() ??
+          AppConstants.drillToleranceMs,
+      sequenceDetected: json['sequenceDetected'] as bool? ?? false,
+      sequenceSeen: json['sequenceSeen'] as bool? ?? false,
       state: json['state'] as String? ?? 'idle',
       pattern: json['pattern'] as String? ?? '',
       bpm: number('bpm'),

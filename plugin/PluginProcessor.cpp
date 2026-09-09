@@ -230,6 +230,7 @@ void MidiGridAnalyzerAudioProcessor::processAudioChunk (juce::AudioBuffer<float>
     p.clickSubChoice = drill.view.config.clickSubdivisionIndex ();
     p.testMode = false;
     p.minVelocity = drill.view.config.minVelocity;
+    p.toleranceMs = static_cast<float> (drill.view.toleranceMs);
   }
   const double gridInterval = drill.active () ? drill.view.config.interval : getSubdivisionPpq (p.subChoice);
 
@@ -822,8 +823,7 @@ bool MidiGridAnalyzerAudioProcessor::parseDrillConfig (const juce::var &message,
   const auto params = readSnapshot (apvts);
   config.beats = params.timeSigNum;
   config.minVelocity = params.minVelocity;
-  config.tolerance = message.hasProperty ("tolerance") ? static_cast<float> (message["tolerance"])
-                                                       : constants::params::toleranceDefault;
+  config.tolerance = message.hasProperty ("tolerance") ? static_cast<float> (message["tolerance"]) : params.toleranceMs;
   if (!std::isfinite (config.tolerance) || config.tolerance < constants::params::toleranceMin ||
       config.tolerance > constants::params::toleranceMax) {
     return false;
@@ -841,6 +841,14 @@ bool MidiGridAnalyzerAudioProcessor::drillCommand (const juce::var &message) {
   DrillCommand command{DrillEngine::Action::Start, {}};
   if (action == "start") {
     if (!parseDrillConfig (message, command.config)) {
+      return false;
+    }
+  } else if (action == "tolerance") {
+    command.action = DrillEngine::Action::Tolerance;
+    command.config.tolerance = static_cast<float> (message["tolerance"]);
+    if (!message.hasProperty ("tolerance") || !std::isfinite (command.config.tolerance) ||
+        command.config.tolerance < constants::params::toleranceMin ||
+        command.config.tolerance > constants::params::toleranceMax) {
       return false;
     }
   } else if (action == "hold") {
@@ -916,6 +924,9 @@ juce::String MidiGridAnalyzerAudioProcessor::getDrillStateJson () {
   obj->setProperty ("noHits", s.noHits);
   obj->setProperty ("limitReached", s.limitReached);
   obj->setProperty ("tolerance", s.toleranceMs);
+  obj->setProperty ("toleranceOverride", s.config.tolerance);
+  obj->setProperty ("sequenceDetected", s.sequenceDetected);
+  obj->setProperty ("sequenceSeen", s.sequenceSeen);
   return juce::JSON::toString (juce::var (obj.get ()));
 }
 

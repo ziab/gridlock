@@ -5,17 +5,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:gridlock_companion/models/drill_state.dart';
+import 'package:gridlock_companion/models/parameter.dart';
 import 'package:gridlock_companion/screens/drill_screen.dart';
 import 'package:gridlock_companion/widgets/status_bar.dart' as app;
 import 'package:gridlock_companion/services/connection_service.dart';
 
 class DrillConnection extends ConnectionService {
   final commands = <String>[];
+  final sentSettings = <Map<String, Object>>[];
+  void publish(DrillState value) {
+    drill = value;
+    notifyListeners();
+  }
+
   @override
   bool get isConnected => true;
   @override
   void drillCommand(String action, {Map<String, Object> settings = const {}}) {
     commands.add(action);
+    sentSettings.add(settings);
   }
 }
 
@@ -43,6 +51,10 @@ void main() {
             'passes': 1,
             'progress': 0.5,
             'automatic': false,
+            'toleranceOverride': 32,
+            'tolerance': 28,
+            'sequenceDetected': true,
+            'sequenceSeen': true,
           }),
         );
       });
@@ -57,6 +69,9 @@ void main() {
         await snapshots.future.timeout(const Duration(seconds: 5));
         expect(connection.drill.active, isTrue);
         expect(connection.drill.best, 81);
+        expect(connection.drill.toleranceOverride, 32);
+        expect(connection.drill.tolerance, 28);
+        expect(connection.drill.sequenceDetected, isTrue);
         expect(connection.drill.automatic, isFalse);
         connection.setParameter('internal_bpm', 150);
         connection.drillCommand('hold');
@@ -121,6 +136,7 @@ void main() {
       expect(find.text('Highest confirmed: 81 BPM'), findsOneWidget);
       expect(find.text('No hits detected — paused'), findsOneWidget);
       expect(find.text('Start'), findsNothing);
+      await tester.ensureVisible(find.text('Resume'));
       await tester.tap(find.text('Resume'));
       expect(connection.commands, ['resume']);
       expect(tester.takeException(), isNull);
@@ -141,10 +157,67 @@ void main() {
           child: const MaterialApp(home: DrillScreen()),
         ),
       );
-      expect(find.text('Play when ready — start with R'), findsOneWidget);
+      expect(find.text('Play when ready — any subdivision'), findsOneWidget);
       expect(find.text('Pattern: RLK'), findsOneWidget);
       expect(find.byType(Chip), findsNothing);
       expect(find.text('Resume'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Live tolerance is initialized from main and sends only drill commands',
+    (tester) async {
+      final connection = DrillConnection();
+      connection.parameters['tolerance_ms'] = RemoteParameter.fromJson(
+        'tolerance_ms',
+        {'value': 12},
+      );
+      await tester.pumpWidget(
+        ChangeNotifierProvider<ConnectionService>.value(
+          value: connection,
+          child: const MaterialApp(home: DrillScreen()),
+        ),
+      );
+      await tester.ensureVisible(find.text('Start'));
+      await tester.tap(find.text('Start'));
+      expect(connection.sentSettings.last['tolerance'], 12);
+      connection.publish(
+        const DrillState(
+          state: 'playing',
+          pattern: 'RLK',
+          toleranceOverride: 12,
+          tolerance: 12,
+          sequenceDetected: true,
+          sequenceSeen: true,
+        ),
+      );
+      await tester.pump();
+      expect(find.text('● Sequence detected'), findsOneWidget);
+      await tester.ensureVisible(find.byType(Slider));
+      await tester.tap(find.byType(Slider));
+      await tester.pump();
+      expect(connection.commands.last, 'tolerance');
+      expect(connection.sentSettings.last['tolerance'], isNot(12));
+      expect(connection.parameters['tolerance_ms']!.value, 12);
+      connection.publish(
+        const DrillState(
+          state: 'playing',
+          pattern: 'RLK',
+          toleranceOverride: 30,
+          tolerance: 25,
+          sequenceSeen: true,
+        ),
+      );
+      await tester.pump();
+      expect(find.text('○ Sequence lost — listening'), findsOneWidget);
+      expect(find.text('Drill tolerance: ±30.0 ms'), findsOneWidget);
+      expect(find.text('Effective window: ±25.0 ms'), findsOneWidget);
+      connection.publish(const DrillState(state: 'finished', pattern: 'RLK'));
+      await tester.pump();
+      await tester.ensureVisible(find.text('Start'));
+      await tester.tap(find.text('Start'));
+      expect(connection.sentSettings.last['tolerance'], 12);
       expect(tester.takeException(), isNull);
     },
   );
@@ -160,14 +233,26 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider<ConnectionService>.value(
         value: connection,
-        child: MaterialApp(home: Builder(builder: (context) => Scaffold(
-          body: Align(alignment: Alignment.topCenter, child: app.StatusBar(
-            connection: connection, onClearGrid: () {}, onOptions: () {}, onRefresh: () {},
-            onDrill: () => Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => const DrillScreen(),
-            )),
-          )),
-        ))),
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Align(
+                alignment: Alignment.topCenter,
+                child: app.StatusBar(
+                  connection: connection,
+                  onClearGrid: () {},
+                  onOptions: () {},
+                  onRefresh: () {},
+                  onDrill: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const DrillScreen(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
     final button = find.byTooltip('Grouping Drill');
