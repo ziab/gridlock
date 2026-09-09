@@ -6,6 +6,8 @@ namespace Theme {
 // ── Backgrounds ──
 inline constexpr juce::uint32 bgMain = 0xff0a0c10;
 inline constexpr juce::uint32 bgHeader = 0xff181b24;
+inline constexpr juce::uint32 bgInput = 0xff1a1d2e;
+inline constexpr juce::uint32 bgCard = 0xff141722;
 inline constexpr juce::uint32 bgLaneEven = 0xff161922;
 inline constexpr juce::uint32 bgLaneOdd = 0xff1a1d28;
 inline constexpr juce::uint32 bgSidebar = 0xff12141a;

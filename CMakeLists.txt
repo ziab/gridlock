@@ -52,6 +52,7 @@ target_sources(MidiGridAnalyzer PRIVATE
     plugin/PluginProcessor.cpp
     plugin/GridComponent.h
     plugin/GridComponent.cpp
+    plugin/EditorLookAndFeel.h
     plugin/PluginEditor.h
     plugin/PluginEditor.cpp
 )
@@ -117,10 +118,12 @@ target_sources(LogicTests PRIVATE
     plugin/ClickGenerator.cpp
     plugin/PluginProcessor.h
     plugin/PluginProcessor.cpp
+    plugin/EditorLookAndFeel.h
     plugin/PluginEditor.h
     plugin/PluginEditor.cpp
     plugin/RemoteControlServer.h
     plugin/RemoteControlServer.cpp
+    plugin/EditorPreview.h
     plugin/LogicTests.cpp
 )
 

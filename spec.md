@@ -145,6 +145,8 @@ struct HitEvent {
 * `RingBuffer<N>` (`plugin/RingBuffer.h`) — `juce::AbstractFifo` wrapper; capacity `N` holds `N-1` items (one slot gap) — `4096` → `4095`.
 
 ### 4.4b Window State Persistence (`PluginEditor.h:110` w)
+* Desktop controls (m): two toolbars separate practice (tempo, signature, metronome, grid pause) from grid display (segmented bars, subdivision, tolerance, label menu, copy/clear). Settings opens a scrollable right panel for click sound/mix, latency/calibration, velocity filtering and demo mode. The grid retains its renderer and expands when settings closes; minimum desktop width is 900px. `EditorLookAndFeel.h` centralizes flat controls and desktop typography; APVTS parameter IDs and Android UI are unchanged.
+* Off-screen visual review (w): `LogicTests.exe --render-ui <absolute-directory>` renders the actual JUCE editor to PNG at desktop and minimum window sizes, including open/scrolled settings, without a native window or audio device.
 * `isMaximized` stored in `ApplicationProperties` (`Gridlock/settings.xml` + `PropertiesFile` for standalone) and `APVTS` child `uiState/isMaximized` for DAW reload. Restored in `parentHierarchyChanged` via `DocumentWindow::isFullScreen`, saved on destroy + 60Hz poll. Standalone-only (VST host owns window).
 
 ### 4.4 Centralized E-Kit Drum Map & Constants (`Source/DrumMap.h`)

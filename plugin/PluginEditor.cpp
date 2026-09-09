@@ -8,6 +8,13 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 
 namespace {
+constexpr int kPracticeHeight = 82;
+constexpr int kToolbarHeight = 68;
+constexpr int kHeaderHeight = kPracticeHeight + kToolbarHeight;
+constexpr int kControlHeight = 36;
+constexpr int kSettingsWidth = 320;
+constexpr int kSettingsContentHeight = 730;
+constexpr int kGap = 12;
 constexpr int kTimeSigNums[] = {2, 3, 4, 5, 6, 7};
 constexpr int kBarsValues[] = {1, 2, 4, 8};
 } // namespace
@@ -37,22 +44,24 @@ int MidiGridAnalyzerAudioProcessorEditor::barsForIndex (int idx) noexcept {
 // ── styling helpers ──
 void MidiGridAnalyzerAudioProcessorEditor::styleCombo (juce::ComboBox &cb, juce::StringArray items, juce::Label &label,
                                                        const char *labelText) {
+  cb.setName (labelText);
   cb.addItemList (items, 1);
   addAndMakeVisible (cb);
   label.setText (labelText, juce::dontSendNotification);
   label.attachToComponent (&cb, false);
-  label.setFont (juce::Font (11.0f, juce::Font::bold));
+  label.setFont (juce::Font (13.0f));
   label.setColour (juce::Label::textColourId, Theme::col (Theme::textLabel));
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::styleSlider (juce::Slider &s, juce::Label &label, const char *labelText,
                                                         int textBoxW, juce::uint32 labelCol) {
-  s.setSliderStyle (juce::Slider::LinearBar);
-  s.setTextBoxStyle (juce::Slider::TextBoxLeft, false, textBoxW, 20);
+  s.setName (labelText);
+  s.setSliderStyle (juce::Slider::LinearHorizontal);
+  s.setTextBoxStyle (juce::Slider::TextBoxRight, false, juce::jmax (textBoxW, 64), 30);
   addAndMakeVisible (s);
   label.setText (labelText, juce::dontSendNotification);
   label.attachToComponent (&s, false);
-  label.setFont (juce::Font (11.0f, juce::Font::bold));
+  label.setFont (juce::Font (13.0f));
   label.setColour (juce::Label::textColourId, Theme::col (labelCol));
 }
 
@@ -69,19 +78,20 @@ void MidiGridAnalyzerAudioProcessorEditor::styleToggle (juce::TextButton &b, juc
 // ── construction ──
 MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (MidiGridAnalyzerAudioProcessor &p)
     : AudioProcessorEditor (&p), processorRef (p) {
+  setLookAndFeel (&desktopLookAndFeel);
   juce::Desktop::setScreenSaverEnabled (false);
   setResizable (true, true);
 
   if (auto *display = juce::Desktop::getInstance ().getDisplays ().getPrimaryDisplay ()) {
     const auto area = display->userArea;
-    const int minW = std::min (1150, area.getWidth () / 2);
+    const int minW = std::min (900, area.getWidth ());
     const int minH = std::min (480, area.getHeight () / 2);
     const int defaultW = std::min (1640, static_cast<int> (area.getWidth () * 0.92));
     const int defaultH = std::min (680, static_cast<int> (area.getHeight () * 0.8));
     setResizeLimits (minW, minH, area.getWidth (), area.getHeight ());
     setSize (defaultW, defaultH);
   } else {
-    setResizeLimits (1150, 480, 1920, 1080);
+    setResizeLimits (900, 480, 1920, 1080);
     setSize (1640, 640);
   }
 
@@ -89,34 +99,35 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
   setupControls ();
   attachParameters ();
   setupTimeSigHandling ();
+  setupDesktopLayout ();
+  resized ();
 
   openGLContext.attachTo (*this);
   startTimerHz (60);
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::setupControls () {
-  styleCombo (barsComboBox, {"1 Bar", "2 Bars", "4 Bars", "8 Bars"}, barsLabel, "Bars:");
-  styleCombo (subdivisionComboBox, {"1/8", "1/8T", "1/16", "1/16T", "1/32"}, subdivisionLabel, "Subdiv:");
-  styleSlider (toleranceSlider, toleranceLabel, "Tolerance:", 45);
-  styleSlider (latencySlider, latencyLabel, "Latency:", 45, Theme::skyBlue);
+  styleCombo (barsComboBox, {"1 Bar", "2 Bars", "4 Bars", "8 Bars"}, barsLabel, "Bars");
+  styleCombo (subdivisionComboBox, {"1/8", "1/8T", "1/16", "1/16T", "1/32"}, subdivisionLabel, "Grid subdivision");
+  styleSlider (toleranceSlider, toleranceLabel, "Tolerance", 45);
+  styleSlider (latencySlider, latencyLabel, "Latency offset", 45, Theme::skyBlue);
   // Device latency read-only display next to user latency
-  deviceLatencyLabel.setText ("Dev:", juce::dontSendNotification);
-  deviceLatencyLabel.setFont (juce::Font (11.0f, juce::Font::bold));
+  deviceLatencyLabel.setText ("Output estimate unavailable", juce::dontSendNotification);
+  deviceLatencyLabel.setFont (juce::Font (13.0f));
   deviceLatencyLabel.setColour (juce::Label::textColourId, Theme::col (Theme::textLabel));
   deviceLatencyLabel.setJustificationType (juce::Justification::centredLeft);
   deviceLatencyLabel.setTooltip (
-      "Audio output latency from device (blockSize + hidden buffers). "
-      "Input/MIDI latency ~1-3ms USB jitter not measurable via audio device - use Latency slider to trim. "
-      "Shows output latency only; input (MIDI) assumed 0 - calibrate with Latency if needed.");
+      "Estimated output latency from one audio buffer. Driver and MIDI delays are not measured here. "
+      "Use calibration or latency offset to compensate for the full setup.");
   addAndMakeVisible (deviceLatencyLabel);
-  styleSlider (velocitySlider, velocityLabel, "Min Vel:", 35);
-  styleSlider (bpmSlider, bpmLabel, "BPM:", 45);
-  styleCombo (timeSigComboBox, {"2/4", "3/4", "4/4", "5/4", "6/8", "7/8"}, timeSigLabel, "Time Sig:");
+  styleSlider (velocitySlider, velocityLabel, "Minimum velocity", 35);
+  styleSlider (bpmSlider, bpmLabel, "TEMPO / BPM", 45);
+  styleCombo (timeSigComboBox, {"2/4", "3/4", "4/4", "5/4", "6/8", "7/8"}, timeSigLabel, "Time signature");
   styleCombo (clickSubComboBox, {"Off", "1/4 Notes", "1/8 Notes", "1/16 Notes", "Triplets"}, clickSubLabel,
-              "Click Sub:");
-  styleCombo (clickSoundComboBox, {"Wood Clave", "Drum Stick Click", "Digital Beep"}, clickSoundLabel, "Click Sound:");
-  styleSlider (clickVolumeSlider, clickVolLabel, "Click Vol:", 35);
-  styleSlider (clickPanSlider, clickPanLabel, "Click Pan:", 35);
+              "Click subdivision");
+  styleCombo (clickSoundComboBox, {"Wood Clave", "Drum Stick Click", "Digital Beep"}, clickSoundLabel, "Sound");
+  styleSlider (clickVolumeSlider, clickVolLabel, "Volume", 35);
+  styleSlider (clickPanSlider, clickPanLabel, "Pan", 35);
 
   calibrateButton.setColour (juce::TextButton::buttonColourId, Theme::col (Theme::skyBlue));
   calibrateButton.setColour (juce::TextButton::textColourOffId, Theme::col (0xff0a0c10));
@@ -144,7 +155,7 @@ void MidiGridAnalyzerAudioProcessorEditor::setupControls () {
   styleToggle (clickToggleButton, Theme::buttonClickOn);
   styleToggle (pauseButton, Theme::buttonPauseOn, 0xffffffff, 0xff000000);
   pauseButton.onStateChange = [this] {
-    pauseButton.setButtonText (pauseButton.getToggleState () ? "RESUME" : "PAUSE");
+    pauseButton.setButtonText (pauseButton.getToggleState () ? "Resume grid" : "Pause grid");
   };
   styleToggle (showMsButton, Theme::buttonMsOn, 0xff818cf8);
   styleToggle (showVelButton, Theme::buttonVelOn, Theme::textLabel);
@@ -218,6 +229,7 @@ MidiGridAnalyzerAudioProcessorEditor::~MidiGridAnalyzerAudioProcessorEditor () {
   openGLContext.detach ();
   juce::Desktop::setScreenSaverEnabled (true);
   stopTimer ();
+  setLookAndFeel (nullptr);
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::parentHierarchyChanged () {
@@ -389,21 +401,21 @@ void MidiGridAnalyzerAudioProcessorEditor::updateDeviceLatency () {
   }
   // Update read-only UI label next to Latency slider
   const double sr = processorRef.getSampleRate ();
-  const double devMs = processorRef.getDeviceLatencyMs (sr > 0.0 ? sr : 44100.0);
+  const double devMs = processorRef.getDeviceLatencyMs (sr > 0.0 ? sr : constants::params::sampleRateFallback);
   const int outSamples = processorRef.getDeviceOutputLatencySamples ();
   const int inSamples = processorRef.getDeviceInputLatencySamples ();
   juce::String txt;
   if (outSamples > 0 || inSamples > 0) {
-    txt = juce::String (outSamples) + "s " + juce::String (devMs, 1) + "ms";
+    txt = "Output estimate: " + juce::String (devMs, 1) + " ms";
     if (inSamples > 0) {
       txt += " (+in " + juce::String (inSamples) + "s)";
     }
   } else if (!processorRef.isStandaloneAppMode ()) {
-    txt = "n/a (VST)";
+    txt = "Output latency managed by host";
   } else {
-    txt = "--";
+    txt = "Output estimate unavailable";
   }
-  deviceLatencyLabel.setText ("Dev: " + txt, juce::dontSendNotification);
+  deviceLatencyLabel.setText (txt, juce::dontSendNotification);
 }
 
 GridViewState MidiGridAnalyzerAudioProcessorEditor::buildGridViewState (int barsVal) const {
@@ -463,7 +475,7 @@ void MidiGridAnalyzerAudioProcessorEditor::updateCalibrationUI () {
   const auto st = processorRef.getCalibrationState ();
   const int stInt = static_cast<int> (st);
   if (st == MidiGridAnalyzerAudioProcessor::CalibState::Idle) {
-    calibrateButton.setButtonText ("CALIBRATE");
+    calibrateButton.setButtonText ("Calibrate");
     calibrateButton.setEnabled (true);
     calibCountOverlay.setVisible (false);
     lastCalibStateSeen = stInt;
@@ -481,7 +493,7 @@ void MidiGridAnalyzerAudioProcessorEditor::updateCalibrationUI () {
   if (st == MidiGridAnalyzerAudioProcessor::CalibState::Recording) {
     const double prog = processorRef.getCalibrationProgress ();
     const int pct = static_cast<int> (std::round (prog * 100.0));
-    calibrateButton.setButtonText ("REC " + juce::String (pct) + "%");
+    calibrateButton.setButtonText ("Recording " + juce::String (pct) + "%");
     calibCountOverlay.setText ("GO!", juce::dontSendNotification);
     calibCountOverlay.setVisible (true);
     calibCountOverlay.toFront (false);
@@ -491,7 +503,7 @@ void MidiGridAnalyzerAudioProcessorEditor::updateCalibrationUI () {
   if (st == MidiGridAnalyzerAudioProcessor::CalibState::Done) {
     // PC is passive — companion shows Apply/Add dialog if online.
     // Only auto-reset when no valid result (no hits / jitter) — valid APPLY stays until companion acts
-    calibrateButton.setButtonText ("DONE");
+    calibrateButton.setButtonText ("Done");
     calibCountOverlay.setVisible (false);
     if (lastCalibStateSeen != stInt) {
       const auto res = processorRef.getCalibrationResult ();
@@ -510,50 +522,198 @@ void MidiGridAnalyzerAudioProcessorEditor::updateCalibrationUI () {
   }
 }
 
+void MidiGridAnalyzerAudioProcessorEditor::setupDesktopLayout () {
+  auto label = [this] (juce::Label &item, const char *text, float size, juce::uint32 colour) {
+    item.setText (text, juce::dontSendNotification);
+    item.setFont (juce::Font (size, juce::Font::bold));
+    item.setColour (juce::Label::textColourId, Theme::col (colour));
+    addAndMakeVisible (item);
+  };
+  label (brandLabel, "GRIDLOCK", 20.0f, Theme::textPrimary);
+  label (practiceLabel, "PRACTICE / MIDI ANALYZER", 10.0f, Theme::textMuted);
+  label (settingsTitle, "Settings", 22.0f, Theme::textPrimary);
+  label (metronomeTitle, "METRONOME", 12.0f, Theme::textMuted);
+  label (timingTitle, "TIMING & CALIBRATION", 12.0f, Theme::textMuted);
+  label (inputTitle, "INPUT & DEMO", 12.0f, Theme::textMuted);
+  settingsViewport.setViewedComponent (&settingsContent, false);
+  settingsViewport.setScrollBarsShown (true, false);
+  settingsViewport.setScrollBarThickness (6);
+  addChildComponent (settingsViewport);
+  for (auto *component : std::initializer_list<juce::Component *>{
+           &settingsTitle, &metronomeTitle, &timingTitle, &inputTitle, &clickSubComboBox, &clickSubLabel,
+           &clickSoundComboBox, &clickSoundLabel, &clickVolumeSlider, &clickVolLabel, &clickPanSlider, &clickPanLabel,
+           &latencySlider, &latencyLabel, &deviceLatencyLabel, &calibrateButton, &velocitySlider, &velocityLabel,
+           &testButton}) {
+    settingsContent.addAndMakeVisible (component);
+  }
+  styleToggle (settingsButton, Theme::emerald, Theme::textPrimary, Theme::emerald);
+  settingsButton.onClick = [this] {
+    resized ();
+    repaint ();
+  };
+  addAndMakeVisible (labelsButton);
+  labelsButton.onClick = [this] { showLabelsMenu (); };
+  setupBarSelection ();
+  for (auto *button : {&showMsButton, &showVelButton, &showNoteNumButton}) {
+    button->setVisible (false);
+  }
+  for (auto *button :
+       {&clickToggleButton, &testButton, &copyTabButton, &clearButton, &calibrateButton, &labelsButton}) {
+    button->setColour (juce::TextButton::textColourOffId, Theme::col (Theme::textPrimary));
+    button->setColour (juce::TextButton::textColourOnId, Theme::col (Theme::emerald));
+    button->setColour (juce::TextButton::buttonOnColourId, Theme::col (Theme::emerald));
+  }
+  pauseButton.setColour (juce::TextButton::textColourOnId, Theme::col (Theme::amber));
+  pauseButton.onStateChange ();
+  clickToggleButton.onStateChange = [this] {
+    clickToggleButton.setButtonText (clickToggleButton.getToggleState () ? "Metronome on" : "Metronome off");
+  };
+  clickToggleButton.onStateChange ();
+  testButton.setButtonText ("Demo beat");
+  setupValueDisplays ();
+  sendLookAndFeelChange ();
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::setupBarSelection () {
+  barsComboBox.setVisible (false);
+  barsLabel.setVisible (true);
+  for (size_t i = 0; i < barButtons.size (); ++i) {
+    auto &button = barButtons[i];
+    button.setButtonText (juce::String (kBarsValues[i]));
+    styleToggle (button, Theme::emerald, Theme::textMuted, Theme::emerald);
+    button.setRadioGroupId (1);
+    button.onClick = [this, i] { barsComboBox.setSelectedItemIndex ((int)i, juce::sendNotificationSync); };
+  }
+  barsComboBox.onChange = [this] {
+    for (size_t i = 0; i < barButtons.size (); ++i) {
+      barButtons[i].setToggleState ((int)i == barsComboBox.getSelectedItemIndex (), juce::dontSendNotification);
+    }
+  };
+  barsComboBox.onChange ();
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::setupValueDisplays () {
+  bpmSlider.setName ("Tempo");
+  bpmSlider.setSliderStyle (juce::Slider::IncDecButtons);
+  bpmSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 88, 42);
+  bpmSlider.setIncDecButtonsMode (juce::Slider::incDecButtonsDraggable_Vertical);
+  bpmSlider.setTooltip ("Type a tempo, use + / -, or drag vertically on the buttons.");
+  toleranceSlider.setTextValueSuffix (" ms");
+  latencySlider.setTextValueSuffix (" ms");
+  latencySlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 82, 30);
+  deviceLatencyLabel.setFont (juce::Font (12.0f));
+  clickVolumeSlider.textFromValueFunction = [] (double value) {
+    return juce::String (juce::roundToInt (value * 100.0)) + "%";
+  };
+  clickVolumeSlider.valueFromTextFunction = [] (const juce::String &text) { return text.getDoubleValue () / 100.0; };
+  clickPanSlider.textFromValueFunction = [] (double value) {
+    if (std::abs (value) < 0.001) {
+      return juce::String ("Centre");
+    }
+    return juce::String (juce::roundToInt (std::abs (value) * 100.0)) + (value < 0.0 ? " L" : " R");
+  };
+  clickPanSlider.valueFromTextFunction = [] (const juce::String &text) {
+    const double value = text.getDoubleValue () / 100.0;
+    return text.containsIgnoreCase ("L") ? -std::abs (value) : value;
+  };
+  clickVolumeSlider.updateText ();
+  clickPanSlider.updateText ();
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::showLabelsMenu () {
+  juce::PopupMenu menu;
+  menu.addItem (1, "Timing offsets (ms)", true, showMsButton.getToggleState ());
+  menu.addItem (2, "Velocity", true, showVelButton.getToggleState ());
+  menu.addItem (3, "MIDI note numbers", true, showNoteNumButton.getToggleState ());
+  menu.showMenuAsync (juce::PopupMenu::Options ().withTargetComponent (&labelsButton),
+                      [safe = juce::Component::SafePointer<MidiGridAnalyzerAudioProcessorEditor> (this)] (int result) {
+                        if (safe != nullptr && result > 0) {
+                          auto *button = result == 1   ? &safe->showMsButton
+                                         : result == 2 ? &safe->showVelButton
+                                                       : &safe->showNoteNumButton;
+                          button->setToggleState (!button->getToggleState (), juce::sendNotificationSync);
+                        }
+                      });
+}
+
 void MidiGridAnalyzerAudioProcessorEditor::paint (juce::Graphics &g) {
   g.fillAll (Theme::col (Theme::bgMain));
   g.setColour (Theme::col (Theme::bgHeader));
-  g.fillRect (0, 0, getWidth (), 65);
+  g.fillRect (0, 0, getWidth (), kPracticeHeight);
   g.setColour (Theme::col (Theme::border));
-  g.drawHorizontalLine (65, 0.0f, static_cast<float> (getWidth ()));
+  g.drawHorizontalLine (kPracticeHeight, 0.0f, (float)getWidth ());
+  g.drawHorizontalLine (kHeaderHeight - 1, 0.0f, (float)getWidth ());
+  if (settingsButton.getToggleState ()) {
+    const int x = getWidth () - kSettingsWidth;
+    g.setColour (Theme::col (Theme::bgCard));
+    g.fillRect (x, kHeaderHeight, kSettingsWidth, getHeight () - kHeaderHeight);
+    g.setColour (Theme::col (Theme::border));
+    g.drawVerticalLine (x, (float)kHeaderHeight, (float)getHeight ());
+  }
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::layoutPracticeControls () {
+  brandLabel.setBounds (20, 18, 155, 28);
+  practiceLabel.setBounds (20, 46, 160, 18);
+  bpmSlider.setBounds (190, 30, 142, 42);
+  bpmLabel.setBounds (190, 8, 142, 20);
+  timeSigComboBox.setBounds (350, 30, 96, kControlHeight);
+  timeSigLabel.setBounds (350, 8, 110, 20);
+  clickToggleButton.setBounds (466, 30, 138, kControlHeight);
+  pauseButton.setBounds (616, 30, 110, kControlHeight);
+  settingsButton.setBounds (getWidth () - 124, 30, 104, kControlHeight);
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::layoutGridControls () {
+  const int y = kPracticeHeight + 26;
+  int x = 20;
+  barsLabel.setBounds (x, kPracticeHeight + 5, 160, 20);
+  for (auto &button : barButtons) {
+    button.setBounds (x, y, 38, kControlHeight);
+    x += 40;
+  }
+  x += kGap;
+  subdivisionComboBox.setBounds (x, y, 132, kControlHeight);
+  subdivisionLabel.setBounds (x, kPracticeHeight + 5, 140, 20);
+  x += 132 + kGap;
+  toleranceSlider.setBounds (x, y, 190, kControlHeight);
+  toleranceLabel.setBounds (x, kPracticeHeight + 5, 190, 20);
+  labelsButton.setBounds (x + 190 + kGap, y, 80, kControlHeight);
+  clearButton.setBounds (getWidth () - 108, y, 88, kControlHeight);
+  copyTabButton.setBounds (getWidth () - 208, y, 88, kControlHeight);
+}
+
+void MidiGridAnalyzerAudioProcessorEditor::layoutSettings () {
+  const int width = kSettingsWidth - 44;
+  settingsContent.setSize (kSettingsWidth - 8, kSettingsContentHeight);
+  settingsTitle.setBounds (20, 16, width, 32);
+  metronomeTitle.setBounds (20, 66, width, 22);
+  auto field = [width] (juce::Component &control, juce::Label &label, int y) {
+    control.setBounds (20, y + 22, width, kControlHeight);
+    label.setBounds (20, y, width, 20);
+  };
+  field (clickSoundComboBox, clickSoundLabel, 100);
+  field (clickSubComboBox, clickSubLabel, 170);
+  field (clickVolumeSlider, clickVolLabel, 240);
+  field (clickPanSlider, clickPanLabel, 310);
+  timingTitle.setBounds (20, 394, width, 22);
+  field (latencySlider, latencyLabel, 428);
+  deviceLatencyLabel.setBounds (20, 490, width, 22);
+  calibrateButton.setBounds (20, 524, width, kControlHeight);
+  inputTitle.setBounds (20, 590, width, 22);
+  field (velocitySlider, velocityLabel, 624);
+  testButton.setBounds (20, 694, width, kControlHeight);
 }
 
 void MidiGridAnalyzerAudioProcessorEditor::resized () {
-  const int headerH = 68;
-  const int topMargin = 24;
-  const int h = 26;
-
-  struct Item {
-    juce::Component *c;
-    int w;
-  };
-  // Widths mirror previous manual layout; FlexBox makes intent explicit and handles overflow.
-  Item items[] = {
-      {&barsComboBox, 74},       {&subdivisionComboBox, 74}, {&toleranceSlider, 85},    {&latencySlider, 85},
-      {&deviceLatencyLabel, 98}, {&calibrateButton, 86},     {&velocitySlider, 65},     {&bpmSlider, 75},
-      {&timeSigComboBox, 64},    {&clickSubComboBox, 85},    {&clickSoundComboBox, 95}, {&clickVolumeSlider, 65},
-      {&clickPanSlider, 65},     {&clickToggleButton, 75},   {&pauseButton, 65},        {&showMsButton, 85},
-      {&showVelButton, 76},      {&showNoteNumButton, 68},   {&testButton, 85},         {&copyTabButton, 84},
-  };
-
-  juce::FlexBox fb;
-  fb.flexDirection = juce::FlexBox::Direction::row;
-  fb.flexWrap = juce::FlexBox::Wrap::noWrap;
-  fb.justifyContent = juce::FlexBox::JustifyContent::flexStart;
-  fb.alignItems = juce::FlexBox::AlignItems::center;
-
-  for (auto &it : items) {
-    fb.items.add (juce::FlexItem (*it.c).withWidth ((float)it.w).withHeight ((float)h).withMargin ({0, 2, 0, 2}));
-  }
-
-  // Clear button pinned to the right edge
-  fb.items.add (juce::FlexItem ().withFlex (1.0f)); // spacer
-  fb.items.add (juce::FlexItem (clearButton).withWidth (78).withHeight ((float)h).withMargin ({0, 4, 0, 2}));
-
-  auto headerArea = juce::Rectangle<int> (4, topMargin, getWidth () - 8, h);
-  fb.performLayout (headerArea);
-
-  gridComponent.setBounds (0, headerH, getWidth (), getHeight () - headerH);
-  // Count-in overlay centered over grid (throne-readable, grid-synced)
-  calibCountOverlay.setBounds (getWidth () / 2 - 120, headerH + getHeight () / 2 - 80, 240, 120);
+  layoutPracticeControls ();
+  layoutGridControls ();
+  const bool settingsOpen = settingsButton.getToggleState ();
+  settingsViewport.setVisible (settingsOpen);
+  settingsViewport.setBounds (getWidth () - kSettingsWidth, kHeaderHeight, kSettingsWidth,
+                              getHeight () - kHeaderHeight);
+  layoutSettings ();
+  gridComponent.setBounds (0, kHeaderHeight, getWidth () - (settingsOpen ? kSettingsWidth : 0),
+                           getHeight () - kHeaderHeight);
+  calibCountOverlay.setBounds (gridComponent.getBounds ().withSizeKeepingCentre (240, 120));
 }

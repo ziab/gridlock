@@ -2,6 +2,7 @@
 #include "ClickGenerator.h"
 #include "Crypto.h"
 #include "DrumMap.h"
+#include "EditorPreview.h"
 #include "GridComponent.h"
 #include "PluginProcessor.h"
 #include "RingBuffer.h"
@@ -762,8 +763,20 @@ public:
 static CalibrationIntegrationTest calibrationIntegrationTest;
 
 // ── runner ──
-int main () {
+class DesktopControlsTest : public juce::UnitTest {
+public:
+  DesktopControlsTest () : UnitTest ("Desktop controls", "UI") {}
+  void runTest () override {
+    EditorPreview::verifyControls (*this);
+  }
+};
+static DesktopControlsTest desktopControlsTest;
+
+int main (int argc, char *argv[]) {
   juce::ScopedJuceInitialiser_GUI juceInit;
+  if (argc == 3 && juce::String (argv[1]) == "--render-ui") {
+    return EditorPreview::render (juce::File (juce::String (argv[2]))) ? 0 : 1;
+  }
   juce::UnitTestRunner runner;
   runner.setAssertOnFailure (false);
   runner.setPassesAreLogged (true);

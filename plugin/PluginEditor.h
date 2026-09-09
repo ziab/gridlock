@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EditorLookAndFeel.h"
 #include "GridComponent.h"
 #include "PluginProcessor.h"
 
@@ -17,6 +18,14 @@ public:
   void parentHierarchyChanged () override;
 
 private:
+  friend struct EditorPreview;
+  void setupDesktopLayout ();
+  void setupBarSelection ();
+  void setupValueDisplays ();
+  void layoutPracticeControls ();
+  void layoutGridControls ();
+  void layoutSettings ();
+  void showLabelsMenu ();
   void timerCallback () override;
   void saveWindowState ();
   void persistMaximizedState (bool isMaximized);
@@ -44,7 +53,16 @@ private:
   void styleToggle (juce::TextButton &b, juce::uint32 onColour, juce::uint32 offText = 0xffffffff,
                     juce::uint32 onText = 0xffffffff);
 
+  EditorLookAndFeel desktopLookAndFeel;
   MidiGridAnalyzerAudioProcessor &processorRef;
+
+  juce::Component settingsContent;
+  juce::Viewport settingsViewport;
+  juce::TextButton settingsButton{"Settings"};
+  juce::TextButton labelsButton{"Labels"};
+  std::array<juce::TextButton, 4> barButtons;
+  juce::Label brandLabel, practiceLabel, settingsTitle, metronomeTitle, timingTitle, inputTitle;
+  juce::TooltipWindow tooltips{this, 600};
 
   GridComponent gridComponent;
 
