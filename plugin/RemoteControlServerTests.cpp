@@ -77,6 +77,12 @@ static void sendTestText (juce::StreamingSocket &client, const juce::String &tex
 
 static void testDrillProtocol (RemoteControlServer &server, juce::StreamingSocket &client) {
   std::cout << "[Test 5] Drill command, acknowledgement, snapshot and disconnect..." << std::flush;
+  int subdivision = -1;
+  server.onClickSubdivision = [&subdivision] (int index) { subdivision = index; };
+  sendTestText (client, R"({"type":"set","id":"click_subdivision","value":4})");
+  juce::MessageManager::getInstance ()->runDispatchLoopUntil (150);
+  assert (subdivision == 4);
+  server.onClickSubdivision = {};
   bool received = false, disconnected = false;
   server.onDrillCommand = [&received] (const juce::var &message) {
     received = message["action"].toString () == "start" && message["pattern"].toString () == "RLK";

@@ -96,6 +96,7 @@ public:
   }
 
   static double getSubdivisionPpq (int index) noexcept;
+  void setClickSubdivisionAndGrid (int index);
   static double getClickSubdivisionPpq (int index) noexcept;
   static ParamSnapshot readSnapshot (const juce::AudioProcessorValueTreeState &apvts) noexcept;
   static double getEffectiveGridInterval (const ParamSnapshot &p) noexcept;

@@ -236,6 +236,12 @@ class _ControlScreenState extends State<ControlScreen>
       connection: connection,
       onClearGrid: () => connection.clearGrid(),
       onOptions: () => _showOptionsModal(context, connection),
+      onDrill: connection.drillSupported ? () {
+        _practiceTimerService.stopPractice();
+        Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => const DrillScreen(),
+        ));
+      } : null,
       onRefresh: () {
         connection.disconnect();
         _startDiscovery();
@@ -1056,12 +1062,6 @@ class _ControlScreenState extends State<ControlScreen>
       ),
       child: Row(
         children: [
-          if (connection.drillSupported)
-            IconButton(tooltip: 'Grouping Drill', icon: const Icon(Icons.repeat, color: AppColors.emerald),
-              onPressed: () {
-                timerService.stopPractice();
-                Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const DrillScreen()));
-              }),
           // Practice Mode Button
           GestureDetector(
             onTap: () {

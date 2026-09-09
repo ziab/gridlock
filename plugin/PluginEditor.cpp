@@ -99,6 +99,9 @@ MidiGridAnalyzerAudioProcessorEditor::MidiGridAnalyzerAudioProcessorEditor (Midi
   addAndMakeVisible (gridComponent);
   setupControls ();
   attachParameters ();
+  clickSubComboBox.onChange = [this] {
+    processorRef.setClickSubdivisionAndGrid (clickSubComboBox.getSelectedItemIndex ());
+  };
   setupTimeSigHandling ();
   setupDesktopLayout ();
   addAndMakeVisible (drillButton);
@@ -748,9 +751,9 @@ void MidiGridAnalyzerAudioProcessorEditor::resized () {
 void MidiGridAnalyzerAudioProcessorEditor::updateDrillUI () {
   const auto s = processorRef.getDrillSnapshot ();
   const bool active = s.state != DrillEngine::State::Idle && s.state != DrillEngine::State::Finished;
-  for (auto *control :
-       std::array<juce::Component *, 9>{&bpmSlider, &timeSigComboBox, &pauseButton, &clickToggleButton, &latencySlider,
-                                        &velocitySlider, &testButton, &calibrateButton, &toleranceSlider}) {
+  for (auto *control : std::array<juce::Component *, 11>{
+           &clickSubComboBox, &subdivisionComboBox, &bpmSlider, &timeSigComboBox, &pauseButton, &clickToggleButton,
+           &latencySlider, &velocitySlider, &testButton, &calibrateButton, &toleranceSlider}) {
     control->setEnabled (!active);
   }
   if (active) {

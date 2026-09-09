@@ -106,6 +106,8 @@ class ConnectionService extends ChangeNotifier {
           'latency_offset_ms',
           'min_velocity',
           'test_mode',
+          'subdivision',
+          'click_subdivision',
         }.contains(id)) {
       return;
     }

@@ -39,6 +39,12 @@ struct EditorPreview {
     test.expectEquals (editor.gridComponent.getWidth (), closedWidth);
     test.expect (!editor.settingsViewport.isVisible ());
 
+    test.beginTest ("Selecting triplet click changes the displayed timing grid");
+    editor.clickSubComboBox.setSelectedItemIndex (4, juce::sendNotificationSync);
+    test.expectEquals ((int)state.getRawParameterValue ("subdivision")->load (), 1);
+    test.expectWithinAbsoluteError (editor.buildGridViewState (4).gridSubdivisionPpq, constants::musical::ppq_1_8T,
+                                    1e-9);
+
     test.beginTest ("Readable mix values retain their underlying parameter units");
     test.expectEquals (editor.clickVolumeSlider.getTextFromValue (0.8), juce::String ("80%"));
     test.expectWithinAbsoluteError (editor.clickVolumeSlider.getValueFromText ("125%"), 1.25, 0.001);

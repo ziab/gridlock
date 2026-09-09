@@ -77,7 +77,6 @@ constexpr double startBpm = 60.0;
 constexpr double eighthStartBpm = 90.0;
 constexpr double resumeRatio = 0.8;
 constexpr double toleranceFraction = 0.15;
-constexpr int countInBars = 2;
 constexpr int silenceBars = 2;
 constexpr int heartbeatTimeoutMs = 5000;
 } // namespace drill

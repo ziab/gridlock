@@ -11,7 +11,7 @@
 // Audio-thread owned. Fixed storage; no allocation, locks, or UI callbacks.
 class DrillEngine {
 public:
-  enum class State { Idle, CountIn, Playing, Paused, Finished };
+  enum class State { Idle, Waiting, Playing, Paused, Finished };
   enum class Action { Start, Hold, TooFast, Pause, Resume, Finish, Retry, Disconnect };
   struct Config {
     std::array<char, constants::drill::maxPattern + 1> pattern{};
@@ -19,6 +19,9 @@ public:
     double interval{constants::musical::ppq_1_16}, bpm{constants::drill::startBpm};
     float tolerance{constants::params::toleranceDefault};
     double latencyMs{0};
+    int clickSubdivisionIndex () const {
+      return interval == constants::musical::ppq_1_8 ? 2 : interval == constants::musical::ppq_1_8T ? 4 : 3;
+    }
   };
   struct Snapshot {
     Config config;
@@ -47,7 +50,7 @@ public:
       view.config = config;
       view.bpm = config.bpm;
       view.attempted = config.bpm;
-      countIn (ppq);
+      waitForFirstHit (ppq);
       return;
     }
     if (!active ()) {
@@ -72,14 +75,14 @@ public:
       view.bpm = fallbackBpm ();
       view.automatic = false;
       view.limitReached = true;
-      countIn (ppq);
+      waitForFirstHit (ppq);
     }
     if (action == Action::Resume || action == Action::Retry) {
       if (action == Action::Retry) {
         view.automatic = true;
         view.limitReached = false;
       }
-      countIn (ppq);
+      waitForFirstHit (ppq);
     }
   }
 
@@ -96,21 +99,12 @@ public:
       // One whole repetition at the new tempo is deliberately unscored.
       beginStage (boundary + cycle ());
     }
-    if (view.state == State::CountIn) {
-      view.beatsRemaining = std::max (0, static_cast<int> (std::ceil (origin - physicalPpq)));
-      if (physicalPpq + epsilon < origin) {
-        return;
-      }
-      view.state = State::Playing;
+    if (view.state == State::Waiting) {
+      return;
     }
-    const auto slot = static_cast<int64_t> (std::floor ((physicalPpq - origin) / interval ()));
-    view.activeSlot = static_cast<int> ((slot % view.config.length + view.config.length) % view.config.length);
     if (physicalPpq - lastHit >= constants::drill::silenceBars * view.config.beats) {
+      waitForFirstHit (physicalPpq);
       view.noHits = true;
-      view.state = State::Paused;
-      view.nextBpm = 0;
-      pendingAt = infinity;
-      view.nextBpm = 0;
       return;
     }
     while (pendingAt == infinity && compensatedPpq > origin + (finalized + 0.5) * interval ()) {
@@ -126,12 +120,27 @@ public:
     if (!running () || note == DrumMap::PedalHiHat) {
       return;
     }
-    const auto slot = static_cast<int64_t> (std::floor ((compensatedPpq - origin) / interval () + 0.5));
-    if (slot < 0) {
-      return;
+    if (view.state == State::Waiting) {
+      const bool firstIsKick = view.config.pattern[0] == 'K';
+      if (firstIsKick != (note == view.config.kick)) {
+        return;
+      }
+      // Capture grouping phase, but retain the metronome's grid for timing accuracy.
+      beginStage (std::round (compensatedPpq / interval ()) * interval ());
+      view.state = State::Playing;
+      view.noHits = false;
     }
+    const auto tick = static_cast<int64_t> (std::floor (compensatedPpq / interval () + 0.5));
+    const bool primaryHit = tick > lastSequenceTick;
+    const bool wantsKick = view.config.pattern[static_cast<size_t> (nextStroke)] == 'K';
+    if (primaryHit) {
+      view.activeSlot = nextStroke;
+      nextStroke = (nextStroke + 1) % view.config.length;
+      lastSequenceTick = tick;
+    }
+    const auto slot = static_cast<int64_t> (std::floor ((compensatedPpq - origin) / interval () + 0.5));
     lastHit = compensatedPpq;
-    if (slot < finalized || pendingAt != infinity) {
+    if (slot < finalized || slot < 0 || pendingAt != infinity) {
       return;
     }
     auto &entry = slots[static_cast<size_t> (slot) % slots.size ()];
@@ -142,7 +151,6 @@ public:
     if (entry.hits != 1) {
       return;
     }
-    const bool wantsKick = view.config.pattern[static_cast<size_t> (slot % view.config.length)] == 'K';
     entry.rightClass = wantsKick == (note == view.config.kick);
     const auto result =
         Timing::compute (compensatedPpq - origin, interval (), view.bpm, static_cast<float> (view.toleranceMs));
@@ -159,7 +167,8 @@ private:
   static constexpr double epsilon = 1e-9;
   std::array<Slot, 4096> slots{};
   double origin{0}, lastHit{0}, pendingAt{infinity};
-  int64_t finalized{0};
+  int64_t finalized{0}, lastSequenceTick{std::numeric_limits<int64_t>::min ()};
+  int nextStroke{0};
   int blockSize{32}, good{0}, missing{0}, wrong{0}, late{0}, extras{0}, struggles{0};
   double interval () const {
     return view.config.interval;
@@ -172,13 +181,15 @@ private:
                ? view.best
                : std::max<double> (constants::params::bpmMin, std::floor (view.bpm * constants::drill::resumeRatio));
   }
-  void countIn (double ppq) {
+  void waitForFirstHit (double ppq) {
     pendingAt = infinity;
     view.nextBpm = 0;
     view.noHits = false;
-    beginStage (std::ceil (ppq / view.config.beats) * view.config.beats +
-                constants::drill::countInBars * view.config.beats);
-    view.state = State::CountIn;
+    nextStroke = 0;
+    lastSequenceTick = std::numeric_limits<int64_t>::min ();
+    beginStage (ppq);
+    view.activeSlot = 0;
+    view.state = State::Waiting;
   }
   void beginStage (double start) {
     origin = start;
@@ -243,6 +254,11 @@ private:
   void schedule (double bpm, double ppq) {
     view.nextBpm = bpm;
     // Leave a full repeat for the announcement and compensated late MIDI to arrive.
-    pendingAt = origin + (std::ceil ((ppq - origin) / cycle ()) + 1) * cycle ();
+    const auto untilRepeat = (view.config.length - nextStroke) % view.config.length;
+    pendingAt = (lastSequenceTick + 1 + untilRepeat) * interval ();
+    const double earliest = ppq + cycle ();
+    if (pendingAt < earliest) {
+      pendingAt += std::ceil ((earliest - pendingAt) / cycle ()) * cycle ();
+    }
   }
 };

@@ -103,7 +103,7 @@ class _DrillScreenState extends State<DrillScreen> {
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
         ),
-        _patternStrip(connection),
+        Text('Pattern: ${drill.pattern}', textAlign: TextAlign.center),
         Text(_status(connection), textAlign: TextAlign.center),
         const SizedBox(height: 12),
         LinearProgressIndicator(value: drill.progress),
@@ -124,23 +124,6 @@ class _DrillScreenState extends State<DrillScreen> {
         if (drill.nextBpm > 0)
           Text('Next repeat: ${drill.nextBpm.round()} BPM'),
         if (drill.active) _actions(connection),
-      ],
-    );
-  }
-
-  Widget _patternStrip(ConnectionService connection) {
-    final drill = connection.drill;
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 8,
-      children: [
-        for (var i = 0; i < drill.pattern.length; i++)
-          Chip(
-            label: Text(drill.pattern[i]),
-            backgroundColor: drill.active && i == drill.activeSlot
-                ? AppColors.emerald
-                : AppColors.bgInput,
-          ),
       ],
     );
   }
@@ -166,7 +149,9 @@ class _DrillScreenState extends State<DrillScreen> {
 
   String _status(ConnectionService connection) {
     final d = connection.drill;
-    if (d.state == 'countin') return 'Count in: ${d.beatsRemaining} beats';
+    if (d.state == 'waiting') {
+      return 'Play when ready — start with ${d.pattern.isEmpty ? '' : d.pattern[0]}';
+    }
     if (d.state == 'paused') {
       return d.noHits ? 'No hits detected — paused' : 'Paused';
     }

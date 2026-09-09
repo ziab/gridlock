@@ -158,14 +158,10 @@ private:
       text = "Enter a grouping and press Start";
     } else {
       auto letters = juce::String (s.config.pattern.data ());
-      if (active) {
-        letters = letters.substring (0, s.activeSlot) + "[" + letters.substring (s.activeSlot, s.activeSlot + 1) + "]" +
-                  letters.substring (s.activeSlot + 1);
-      }
       patternLine.setText (letters, juce::dontSendNotification);
       text = active ? juce::String () : letters + "   " + juce::String (s.bpm, 0) + " BPM";
-      if (s.state == DrillEngine::State::CountIn) {
-        text += " — Count in: " + juce::String (s.beatsRemaining);
+      if (s.state == DrillEngine::State::Waiting) {
+        text += "Play when ready — start with " + letters.substring (0, 1);
       } else if (s.state == DrillEngine::State::Paused) {
         text += s.noHits ? " — No hits detected" : " — Paused";
       } else if (s.state == DrillEngine::State::Finished) {

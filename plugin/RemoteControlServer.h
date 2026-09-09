@@ -40,6 +40,7 @@ public:
   std::function<bool (const juce::var &)> onDrillCommand;
   std::function<juce::String ()> getDrillJson;
   std::function<bool ()> drillIsActive;
+  std::function<void (int)> onClickSubdivision;
   std::function<void ()> onDrillDisconnect;
 
 private:

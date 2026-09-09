@@ -423,11 +423,16 @@ void RemoteControlServer::handleClientMessage (juce::StreamingSocket &client, co
     juce::String paramId = obj->getProperty ("id").toString ();
     double value = obj->getProperty ("value");
     const juce::StringArray owned{"internal_bpm",      "time_sig_num", "is_paused", "click_enabled",
-                                  "latency_offset_ms", "min_velocity", "test_mode", "tolerance_ms"};
+                                  "latency_offset_ms", "min_velocity", "test_mode", "tolerance_ms",
+                                  "click_subdivision", "subdivision"};
     if (drillIsActive && drillIsActive () && owned.contains (paramId)) {
       return;
     }
 
+    if (paramId == "click_subdivision" && onClickSubdivision) {
+      onClickSubdivision (static_cast<int> (value));
+      return;
+    }
     if (auto *param = apvts.getParameter (paramId)) {
       float normalized = param->convertTo0to1 (static_cast<float> (value));
       param->setValueNotifyingHost (normalized);

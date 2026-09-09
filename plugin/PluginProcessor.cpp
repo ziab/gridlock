@@ -53,6 +53,7 @@ MidiGridAnalyzerAudioProcessor::MidiGridAnalyzerAudioProcessor ()
         [this] { cancelCalibration (); }, [this] { return getCalibrationStateJson (); });
     remoteServer->onDrillCommand = [this] (const juce::var &message) { return drillCommand (message); };
     remoteServer->drillIsActive = [this] { return isDrillActive (); };
+    remoteServer->onClickSubdivision = [this] (int index) { setClickSubdivisionAndGrid (index); };
     remoteServer->getDrillJson = [this] { return getDrillStateJson (); };
     remoteServer->onDrillDisconnect = [this] {
       juce::DynamicObject::Ptr message = new juce::DynamicObject ();
@@ -226,11 +227,11 @@ void MidiGridAnalyzerAudioProcessor::processAudioChunk (juce::AudioBuffer<float>
     p.timeSigNum = drill.view.config.beats;
     p.isPaused = !drill.running ();
     p.clickEnabled = true;
-    p.clickSubChoice = 1;
+    p.clickSubChoice = drill.view.config.clickSubdivisionIndex ();
     p.testMode = false;
     p.minVelocity = drill.view.config.minVelocity;
   }
-  const double gridInterval = getSubdivisionPpq (p.subChoice);
+  const double gridInterval = drill.active () ? drill.view.config.interval : getSubdivisionPpq (p.subChoice);
 
   updateHostSyncAndPlayhead (p.internalBpm, p.timeSigNum, p.isPaused);
 
@@ -879,6 +880,7 @@ bool MidiGridAnalyzerAudioProcessor::drillCommand (const juce::var &message) {
   }
   if (action == "start") {
     cancelCalibration ();
+    setClickSubdivisionAndGrid (command.config.clickSubdivisionIndex ());
   }
   if (action == "finish") {
     apvts.getParameter ("click_enabled")->setValueNotifyingHost (0);
@@ -891,7 +893,7 @@ bool MidiGridAnalyzerAudioProcessor::drillCommand (const juce::var &message) {
 juce::String MidiGridAnalyzerAudioProcessor::getDrillStateJson () {
   const auto s = getDrillSnapshot ();
   juce::DynamicObject::Ptr obj = new juce::DynamicObject ();
-  const char *states[] = {"idle", "countin", "playing", "paused", "finished"};
+  const char *states[] = {"idle", "waiting", "playing", "paused", "finished"};
   obj->setProperty ("type", "drill");
   obj->setProperty ("history", drillHistory.updateAndCopy (s));
   obj->setProperty ("state", states[static_cast<int> (s.state)]);
@@ -915,4 +917,18 @@ juce::String MidiGridAnalyzerAudioProcessor::getDrillStateJson () {
   obj->setProperty ("limitReached", s.limitReached);
   obj->setProperty ("tolerance", s.toleranceMs);
   return juce::JSON::toString (juce::var (obj.get ()));
+}
+
+void MidiGridAnalyzerAudioProcessor::setClickSubdivisionAndGrid (int index) {
+  if (index < 0 || index > 4) {
+    return;
+  }
+  auto *click = apvts.getParameter ("click_subdivision");
+  click->setValueNotifyingHost (click->convertTo0to1 (static_cast<float> (index)));
+  // Off and quarter-note clicks retain the independent display-grid choice.
+  if (index >= 2) {
+    const int gridIndex = index == 2 ? 0 : index == 4 ? 1 : 2;
+    auto *grid = apvts.getParameter ("subdivision");
+    grid->setValueNotifyingHost (grid->convertTo0to1 (static_cast<float> (gridIndex)));
+  }
 }

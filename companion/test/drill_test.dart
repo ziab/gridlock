@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:gridlock_companion/models/drill_state.dart';
 import 'package:gridlock_companion/screens/drill_screen.dart';
+import 'package:gridlock_companion/widgets/status_bar.dart' as app;
 import 'package:gridlock_companion/services/connection_service.dart';
 
 class DrillConnection extends ConnectionService {
@@ -125,4 +126,62 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets(
+    'Waiting drill has a static pattern reference and no moving helper',
+    (tester) async {
+      final connection = DrillConnection();
+      connection.drill = const DrillState(
+        state: 'waiting',
+        pattern: 'RLK',
+        bpm: 60,
+      );
+      await tester.pumpWidget(
+        ChangeNotifierProvider<ConnectionService>.value(
+          value: connection,
+          child: const MaterialApp(home: DrillScreen()),
+        ),
+      );
+      expect(find.text('Play when ready — start with R'), findsOneWidget);
+      expect(find.text('Pattern: RLK'), findsOneWidget);
+      expect(find.byType(Chip), findsNothing);
+      expect(find.text('Resume'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Grouping drill opens from the upper bar on a narrow phone', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final connection = DrillConnection()..drillSupported = true;
+    await tester.pumpWidget(
+      ChangeNotifierProvider<ConnectionService>.value(
+        value: connection,
+        child: MaterialApp(home: Builder(builder: (context) => Scaffold(
+          body: Align(alignment: Alignment.topCenter, child: app.StatusBar(
+            connection: connection, onClearGrid: () {}, onOptions: () {}, onRefresh: () {},
+            onDrill: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => const DrillScreen(),
+            )),
+          )),
+        ))),
+      ),
+    );
+    final button = find.byTooltip('Grouping Drill');
+    expect(button, findsOneWidget);
+    expect(
+      find.ancestor(of: button, matching: find.byType(app.StatusBar)),
+      findsOneWidget,
+    );
+    expect(tester.getTopLeft(button).dy, lessThan(80));
+    await tester.tap(button);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(DrillScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
 }
