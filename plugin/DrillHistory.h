@@ -19,8 +19,7 @@ public:
   double suggestion (const juce::String &pattern, int spacing, int kick, double tolerance) const {
     std::lock_guard<std::mutex> lock (mutex);
     const double best = static_cast<double> (records[juce::Identifier (key (pattern, spacing, kick, tolerance))]);
-    return best > 0       ? std::clamp (std::floor (best * constants::drill::resumeRatio),
-                                        static_cast<double> (constants::params::bpmMin),
+    return best > 0       ? std::clamp (std::floor (best * constants::drill::resumeRatio), constants::drill::minBpm,
                                         static_cast<double> (constants::params::bpmMax))
            : spacing == 0 ? constants::drill::eighthStartBpm
                           : constants::drill::startBpm;

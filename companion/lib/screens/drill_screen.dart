@@ -45,7 +45,10 @@ class _DrillScreenState extends State<DrillScreen> {
               .toString()
         : (best * AppConstants.drillResumeRatio)
               .floor()
-              .clamp(AppConstants.bpmMin.toInt(), AppConstants.bpmMax.toInt())
+              .clamp(
+                AppConstants.drillMinBpm.toInt(),
+                AppConstants.bpmMax.toInt(),
+              )
               .toString();
   }
 

@@ -196,9 +196,8 @@ private:
     return interval () * view.config.length;
   }
   double fallbackBpm () const {
-    return view.best > 0
-               ? view.best
-               : std::max<double> (constants::params::bpmMin, std::floor (view.bpm * constants::drill::resumeRatio));
+    const double raw = view.best > 0 ? view.best : std::floor (view.bpm * constants::drill::resumeRatio);
+    return std::clamp (raw, constants::drill::minBpm, static_cast<double> (constants::params::bpmMax));
   }
   void loseSequence () {
     if (view.sequenceDetected) {
@@ -302,9 +301,22 @@ private:
       }
     } else if (view.automatic &&
                (struggles >= constants::drill::requiredStruggles || view.blocks >= constants::drill::maxBlocks)) {
-      view.automatic = false;
-      view.limitReached = true;
-      schedule (fallbackBpm (), physicalPpq);
+      const double confirmed =
+          std::clamp (view.best, constants::drill::minBpm, static_cast<double> (constants::params::bpmMax));
+      if (view.best > 0 && confirmed < view.bpm - 1e-9) {
+        // Climbed above a proven tempo then struggled: step back to the confirmed
+        // tempo but stay automatic so clean playing climbs again. Slower is not
+        // easier, so never drop below what was already proven.
+        schedule (confirmed, physicalPpq);
+        view.limitReached = false;
+      } else {
+        // Nothing confirmed yet: hold the starting tempo and keep listening.
+        // Auto-dropping to ~48 BPM traps players at a harder-to-play tempo
+        // with increases locked out.
+        struggles = 0;
+        view.blocks = 0;
+        view.limitReached = false;
+      }
     }
   }
   void schedule (double bpm, double ppq) {

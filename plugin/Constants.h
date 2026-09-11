@@ -73,6 +73,7 @@ constexpr int requiredPasses = 2;
 constexpr int requiredStruggles = 2;
 constexpr int maxBlocks = 6;
 constexpr double bpmStep = 3.0;
+constexpr double minBpm = 60.0;
 constexpr double startBpm = 60.0;
 constexpr double eighthStartBpm = 90.0;
 constexpr double resumeRatio = 0.8;

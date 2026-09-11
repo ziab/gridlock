@@ -7,6 +7,7 @@ public:
   void runTest () override {
     testProgression ();
     testScoring ();
+    testRecovery ();
     testControls ();
     testFreeEntry ();
     testDetection ();
@@ -78,14 +79,15 @@ private:
     expectEquals (e.view.accuracy, 1.0);
   }
   void testScoring () {
-    beginTest ("Missing notes cannot produce a perfect score and trigger step back");
+    beginTest ("Missing notes hold tempo when nothing is confirmed yet");
     auto e = started ();
     play (e, 0, 42, 2);
     expectEquals (e.view.missing, 21);
     expectEquals (e.view.accuracy, 0.5);
     play (e, 42, 42, 2);
-    expect (e.view.limitReached && !e.view.automatic);
-    expectEquals (e.view.nextBpm, 48.0);
+    expect (e.view.automatic && !e.view.limitReached);
+    expectEquals (e.view.nextBpm, 0.0);
+    expectEquals (e.view.bpm, 60.0);
     expectEquals (e.view.best, 0.0);
 
     beginTest ("Duplicate hits are extras, not additional correct strokes");
@@ -115,11 +117,64 @@ private:
     expectEquals (e.view.wrong, 0);
     expectEquals (e.view.correct, 41);
 
-    beginTest ("Six borderline blocks conclude the stage");
+    beginTest ("Six borderline blocks hold tempo and keep climbing enabled");
     e = started ();
     play (e, 0, 42 * 6, 10);
-    expect (e.view.limitReached);
-    expectEquals (e.view.blocks, 6);
+    expect (e.view.automatic && !e.view.limitReached);
+    expectEquals (e.view.bpm, 60.0);
+    expectEquals (e.view.nextBpm, 0.0);
+  }
+  static int forwardToBoundary (DrillEngine &e, int next) {
+    // Keep the sequence alive through the unscored announcement repeat,
+    // mirroring testProgression: play every slot until the pending boundary.
+    const double boundary = e.nextBoundary ();
+    int guard = 0;
+    while (std::isfinite (boundary) && 8 + next * constants::musical::ppq_1_16 < boundary - 0.001 && guard++ < 64) {
+      const double at = 8 + next * constants::musical::ppq_1_16;
+      const int stroke = e.view.state == DrillEngine::State::Waiting ? 0 : (e.view.activeSlot + 1) % 3;
+      e.hit (at, stroke == 2 ? DrumMap::Kick : DrumMap::SnareHead);
+      e.advance (at + 0.13, at + 0.13);
+      ++next;
+    }
+    e.advance (boundary, boundary);
+    return next;
+  }
+  void testRecovery () {
+    beginTest ("Struggling after a climb steps back to confirmed tempo but stays automatic");
+    auto e = started ();
+    play (e, 0, 84);
+    expectEquals (e.view.best, 60.0);
+    expectEquals (e.view.nextBpm, 63.0);
+    int next = forwardToBoundary (e, 84);
+    expectEquals (e.view.bpm, 63.0);
+    expect (e.view.automatic);
+    // Stop as soon as the step-back schedules: advancing past the pending
+    // boundary would apply the tempo change mid-play.
+    for (int k = 0; k < 70 && e.view.nextBpm == 0; ++k) {
+      play (e, next, 2, 2);
+      next += 2;
+    }
+    expectEquals (e.view.bpm, 63.0);
+    expectEquals (e.view.nextBpm, 60.0);
+    expect (e.view.automatic && !e.view.limitReached);
+    expect (e.view.bpm >= constants::drill::minBpm);
+
+    beginTest ("Clean playing after a step-back climbs again");
+    next = forwardToBoundary (e, next);
+    expectEquals (e.view.bpm, 60.0);
+    expect (e.view.automatic);
+    for (int k = 0; k < 70 && e.view.nextBpm == 0; ++k) {
+      play (e, next, 2);
+      next += 2;
+    }
+    expectEquals (e.view.best, 60.0);
+    expectEquals (e.view.nextBpm, 63.0);
+
+    beginTest ("Tempo never drops below the 60 BPM floor");
+    e = started ();
+    e.command (DrillEngine::Action::TooFast, config (), 29);
+    expect (e.view.bpm >= constants::drill::minBpm);
+    expectEquals (e.view.bpm, 60.0);
   }
   void testControls () {
     beginTest ("Silence rearms listening while the click keeps running");

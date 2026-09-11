@@ -23,6 +23,7 @@ abstract final class AppConstants {
   // ── Practice timer ──
   // Adaptive drill defaults; mirrors constants::drill and DrumMap::Kick.
   static const drillStartBpm = 60.0;
+  static const drillMinBpm = 60.0;
   static const drillEighthStartBpm = 90;
   static const drillKickNote = 36;
   static const double drillToleranceMs = 20;
