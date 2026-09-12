@@ -89,7 +89,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MidiGridAnalyzerAudioProcess
   addInt (params, "time_sig_num", "Time Sig Numerator", constants::params::timeSigMin, constants::params::timeSigMax,
           constants::params::timeSigDefault);
   addChoice (params, "click_subdivision", "Click Subdivision",
-             {"Off", "1/4 Notes", "1/8 Notes", "1/16 Notes", "Triplets"}, 1);
+             {"Off", "1/4 Notes", "1/8 Notes", "1/16 Notes", "Triplets", "Sixtuplets"}, 1);
   addChoice (params, "click_sample_preset", "Click Sound Preset", {"Wood Clave", "Drum Stick Click", "Digital Beep"},
              0);
   addFloat (params, "click_volume", "Click Volume",
@@ -138,6 +138,8 @@ double MidiGridAnalyzerAudioProcessor::getClickSubdivisionPpq (int index) noexce
     return ppq_click_1_16;
   case 4:
     return ppq_click_triplet;
+  case 5:
+    return ppq_click_1_6;
   default:
     return 0.0;
   }
@@ -805,7 +807,7 @@ bool MidiGridAnalyzerAudioProcessor::parseDrillConfig (const juce::var &message,
   const int spacing = static_cast<int> (message["spacing"]);
   const double bpm = static_cast<double> (message["bpm"]);
   const int kick = message.hasProperty ("kick") ? static_cast<int> (message["kick"]) : DrumMap::Kick;
-  if (spacing < 0 || spacing > 2 || static_cast<double> (message["spacing"]) != spacing || !std::isfinite (bpm) ||
+  if (spacing < 0 || spacing > 3 || static_cast<double> (message["spacing"]) != spacing || !std::isfinite (bpm) ||
       bpm < constants::params::bpmMin || bpm > constants::params::bpmMax || kick < 0 || kick > 127 ||
       kick == DrumMap::PedalHiHat) {
     return false;
@@ -819,6 +821,7 @@ bool MidiGridAnalyzerAudioProcessor::parseDrillConfig (const juce::var &message,
   config.kick = kick;
   config.interval = spacing == 0   ? constants::musical::ppq_1_8
                     : spacing == 1 ? constants::musical::ppq_1_8T
+                    : spacing == 3 ? constants::musical::ppq_1_6
                                    : constants::musical::ppq_1_16;
   const auto params = readSnapshot (apvts);
   config.beats = params.timeSigNum;
@@ -958,14 +961,16 @@ juce::String MidiGridAnalyzerAudioProcessor::getDrillStateJson () {
 }
 
 void MidiGridAnalyzerAudioProcessor::setClickSubdivisionAndGrid (int index) {
-  if (index < 0 || index > 4) {
+  if (index < 0 || index > 5) {
     return;
   }
   auto *click = apvts.getParameter ("click_subdivision");
   click->setValueNotifyingHost (click->convertTo0to1 (static_cast<float> (index)));
   // Off and quarter-note clicks retain the independent display-grid choice.
   if (index >= 2) {
-    const int gridIndex = index == 2 ? 0 : index == 4 ? 1 : 2;
+    // Sixtuplets (1/6) match the 1/16T display grid exactly; the drill itself
+    // renders from its own interval regardless.
+    const int gridIndex = index == 2 ? 0 : index == 4 ? 1 : index == 5 ? 3 : 2;
     auto *grid = apvts.getParameter ("subdivision");
     grid->setValueNotifyingHost (grid->convertTo0to1 (static_cast<float> (gridIndex)));
   }

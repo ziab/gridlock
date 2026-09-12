@@ -1,7 +1,7 @@
-#include "DrillTests.h"
 #include "AsciiTabRenderer.h"
 #include "ClickGenerator.h"
 #include "Crypto.h"
+#include "DrillTests.h"
 #include "DrumMap.h"
 #include "EditorPreview.h"
 #include "GridComponent.h"
@@ -160,6 +160,7 @@ public:
     expectWithinAbsoluteError (cg.getClickSubdivisionPpq (2), 0.5, 1e-9);
     expectWithinAbsoluteError (cg.getClickSubdivisionPpq (3), 0.25, 1e-9);
     expectWithinAbsoluteError (cg.getClickSubdivisionPpq (4), 1.0 / 3.0, 1e-9);
+    expectWithinAbsoluteError (cg.getClickSubdivisionPpq (5), 1.0 / 6.0, 1e-9);
     expectWithinAbsoluteError (cg.getClickSubdivisionPpq (99), 0.0, 1e-9);
   }
 };

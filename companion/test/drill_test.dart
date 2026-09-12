@@ -380,6 +380,31 @@ void main() {
     },
   );
 
+  testWidgets('Setup offers sixtuplets for rudiments like RLRLKK', (
+    tester,
+  ) async {
+    final connection = DrillConnection();
+    await tester.pumpWidget(
+      ChangeNotifierProvider<ConnectionService>.value(
+        value: connection,
+        child: const MaterialApp(home: DrillScreen()),
+      ),
+    );
+    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.pumpAndSettle();
+    expect(find.text('Sixtuplet'), findsOneWidget);
+    await tester.tap(find.text('Sixtuplet'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, 'RLRLKK');
+    await tester.ensureVisible(find.text('Start'));
+    await tester.tap(find.text('Start'));
+    await tester.pump();
+    expect(connection.commands.last, 'start');
+    expect(connection.sentSettings.last['spacing'], 3);
+    expect(connection.sentSettings.last['pattern'], 'RLRLKK');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Grouping drill opens from the upper bar on a narrow phone', (
     tester,
   ) async {

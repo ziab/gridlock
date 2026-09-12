@@ -45,7 +45,7 @@ abstract final class AppConstants {
 
   // ── UI ──
   static const historyOptions = ['1 Bar', '2 Bars', '4 Bars', '8 Bars'];
-  static const subdivisionOptions = ['Off', '1/4', '1/8', '1/16', 'Trip'];
+  static const subdivisionOptions = ['Off', '1/4', '1/8', '1/16', 'Trip', 'Sixt'];
   static const timeSignatures = [
     (num: 2, label: '2/4'),
     (num: 3, label: '3/4'),

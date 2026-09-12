@@ -11,7 +11,7 @@ public:
     pattern.setInputRestrictions (constants::drill::maxPattern);
     pattern.setTooltip ("Pattern: R and L are hand hits; K is kick. Spaces are allowed.");
     addAndMakeVisible (spacing);
-    spacing.addItemList ({"Eighth notes", "Triplets", "Sixteenth notes"}, 1);
+    spacing.addItemList ({"Eighth notes", "Triplets", "Sixteenth notes", "Sixtuplets"}, 1);
     spacing.setSelectedId (3);
     spacing.onChange = [this] { suggestTempo (); };
     addAndMakeVisible (bpm);
@@ -184,6 +184,7 @@ private:
       }
       const int id = s.config.interval == constants::musical::ppq_1_8    ? 1
                      : s.config.interval == constants::musical::ppq_1_8T ? 2
+                     : s.config.interval == constants::musical::ppq_1_6  ? 4
                                                                          : 3;
       spacing.setSelectedId (id, juce::dontSendNotification);
     }

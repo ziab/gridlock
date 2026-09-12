@@ -46,6 +46,7 @@ constexpr float sampleRateFallback = 44100.0f;
 namespace musical {
 constexpr double ppq_1_8 = 0.5;
 constexpr double ppq_1_8T = 0.5 * 2.0 / 3.0;
+constexpr double ppq_1_6 = 1.0 / 6.0;
 constexpr double ppq_1_16 = 0.25;
 constexpr double ppq_1_16T = 0.25 * 2.0 / 3.0;
 constexpr double ppq_1_32 = 0.125;
@@ -56,6 +57,7 @@ constexpr double ppq_click_1_4 = 1.0;
 constexpr double ppq_click_1_8 = 0.5;
 constexpr double ppq_click_1_16 = 0.25;
 constexpr double ppq_click_triplet = 1.0 / 3.0;
+constexpr double ppq_click_1_6 = 1.0 / 6.0;
 
 constexpr std::array<double, 3> candidatesAuto = {ppq_1_16, ppq_1_32, ppq_1_64};
 } // namespace musical

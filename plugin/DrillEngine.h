@@ -22,7 +22,10 @@ public:
     double stepBpm{constants::drill::bpmStep};
     double latencyMs{0};
     int clickSubdivisionIndex () const {
-      return interval == constants::musical::ppq_1_8 ? 2 : interval == constants::musical::ppq_1_8T ? 4 : 3;
+      return interval == constants::musical::ppq_1_8    ? 2
+             : interval == constants::musical::ppq_1_8T ? 4
+             : interval == constants::musical::ppq_1_6  ? 5
+                                                        : 3;
     }
   };
   struct Snapshot {

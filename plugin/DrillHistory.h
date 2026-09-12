@@ -33,6 +33,7 @@ public:
       if (s.best > 0) {
         const int spacing = s.config.interval == constants::musical::ppq_1_8    ? 0
                             : s.config.interval == constants::musical::ppq_1_8T ? 1
+                            : s.config.interval == constants::musical::ppq_1_6  ? 3
                                                                                 : 2;
         records.getDynamicObject ()->setProperty (key (juce::String (s.config.pattern.data ()), spacing, s.config.kick,
                                                        s.config.tolerance, s.config.passThreshold),

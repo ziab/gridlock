@@ -281,6 +281,7 @@ class _DrillScreenState extends State<DrillScreen> {
             DropdownMenuItem(value: 0, child: Text('Eighth note')),
             DropdownMenuItem(value: 1, child: Text('Triplet')),
             DropdownMenuItem(value: 2, child: Text('Sixteenth note')),
+            DropdownMenuItem(value: 3, child: Text('Sixtuplet')),
           ],
           onChanged: (value) {
             setState(() {

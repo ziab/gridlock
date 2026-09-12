@@ -106,6 +106,8 @@ double ClickGenerator::getClickSubdivisionPpq (int index) const noexcept {
     return ppq_click_1_16;
   case 4:
     return ppq_click_triplet;
+  case 5:
+    return ppq_click_1_6;
   default:
     return 0.0;
   }

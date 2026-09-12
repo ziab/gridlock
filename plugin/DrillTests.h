@@ -11,6 +11,7 @@ public:
     testPassThreshold ();
     testSessionFloor ();
     testStepSize ();
+    testSixtuplets ();
     testControls ();
     testFreeEntry ();
     testDetection ();
@@ -299,6 +300,29 @@ private:
     play (e, 0, 84);
     expectEquals (e.view.best, 60.0);
     expectEquals (e.view.nextBpm, 65.0);
+  }
+  void testSixtuplets () {
+    beginTest ("Sixtuplet RLRLKK confirms tempo and maps to the sixtuplet click");
+    DrillEngine e;
+    DrillEngine::Config c;
+    const auto text = juce::String ("RLRLKK");
+    c.length = text.length ();
+    text.copyToUTF8 (c.pattern.data (), c.pattern.size ());
+    c.interval = constants::musical::ppq_1_6;
+    expectEquals (c.clickSubdivisionIndex (), 5);
+    e.command (DrillEngine::Action::Start, c, 0);
+    e.advance (8, 8);
+    expectEquals (e.view.expected, 60);
+    for (int i = 0; i < 120; ++i) {
+      const double at = 8 + i * constants::musical::ppq_1_6;
+      const int stroke = e.view.state == DrillEngine::State::Waiting ? 0 : (e.view.activeSlot + 1) % 6;
+      e.hit (at, stroke == 4 || stroke == 5 ? DrumMap::Kick : DrumMap::SnareHead);
+      e.advance (at + 0.1, at + 0.1);
+    }
+    expect (e.view.sequenceDetected);
+    expectEquals (e.view.passes, 2);
+    expectEquals (e.view.best, 60.0);
+    expectEquals (e.view.nextBpm, 63.0);
   }
   void testControls () {
     beginTest ("Silence rearms listening while the click keeps running");
@@ -601,10 +625,11 @@ private:
   }
   void testSubdivisions () {
     beginTest ("Selected drill subdivisions produce audible clicks and matching hit/grid timing");
-    const double intervals[]{constants::musical::ppq_1_8, constants::musical::ppq_1_8T, constants::musical::ppq_1_16};
-    const int clickIndices[]{2, 4, 3};
-    const int gridIndices[]{0, 1, 2};
-    for (int spacing = 0; spacing < 3; ++spacing) {
+    const double intervals[]{constants::musical::ppq_1_8, constants::musical::ppq_1_8T, constants::musical::ppq_1_16,
+                             constants::musical::ppq_1_6};
+    const int clickIndices[]{2, 4, 3, 5};
+    const int gridIndices[]{0, 1, 2, 3};
+    for (int spacing = 0; spacing < 4; ++spacing) {
       MidiGridAnalyzerAudioProcessor p;
       p.prepareToPlay (44100, 512);
       p.isStandaloneMode = true;
@@ -625,6 +650,12 @@ private:
       expectWithinAbsoluteError (hit.deltaMs, 0.0, 0.001);
       expectWithinAbsoluteError (p.getDrillSnapshot ().config.interval, intervals[spacing], 1e-9);
     }
+
+    beginTest ("Spacing outside 0-3 is rejected");
+    MidiGridAnalyzerAudioProcessor q;
+    q.prepareToPlay (44100, 512);
+    q.isStandaloneMode = true;
+    expect (!q.drillCommand (juce::JSON::parse (R"({"action":"start","pattern":"RLK","spacing":4,"bpm":60})")));
   }
 };
 static DrillProcessorTests drillProcessorTests;
