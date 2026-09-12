@@ -12,12 +12,13 @@
 class DrillEngine {
 public:
   enum class State { Idle, Waiting, Playing, Paused, Finished };
-  enum class Action { Start, Hold, TooFast, Pause, Resume, Finish, Retry, Disconnect, Tolerance };
+  enum class Action { Start, Hold, TooFast, Pause, Resume, Finish, Retry, Disconnect, Tolerance, PassThreshold };
   struct Config {
     std::array<char, constants::drill::maxPattern + 1> pattern{};
     int length{0}, kick{DrumMap::Kick}, beats{4}, minVelocity{5};
     double interval{constants::musical::ppq_1_16}, bpm{constants::drill::startBpm};
     float tolerance{constants::params::toleranceDefault};
+    double passThreshold{constants::drill::passThresholdDefault};
     double latencyMs{0};
     int clickSubdivisionIndex () const {
       return interval == constants::musical::ppq_1_8 ? 2 : interval == constants::musical::ppq_1_8T ? 4 : 3;
@@ -32,6 +33,7 @@ public:
     int correct{0}, missing{0}, wrong{0}, late{0}, extras{0}, expected{0};
     bool sequenceDetected{false}, sequenceSeen{false};
     bool automatic{true}, noHits{false}, limitReached{false};
+    bool hasBlock{false}, failAccuracy{false}, failExtras{false}, failSequence{false};
   };
 
   Snapshot view;
@@ -62,9 +64,21 @@ public:
       view.best = 0;
       view.accuracy = 0;
       view.correct = view.missing = view.wrong = view.late = view.extras = 0;
+      view.hasBlock = view.failAccuracy = view.failExtras = view.failSequence = false;
       pendingAt = infinity;
       view.nextBpm = 0;
       // Do not mix results measured with different tolerances. Keep the clock and phase.
+      beginStage (std::ceil (ppq / interval ()) * interval ());
+    }
+    if (action == Action::PassThreshold && config.passThreshold != view.config.passThreshold) {
+      view.config.passThreshold = config.passThreshold;
+      view.best = 0;
+      view.accuracy = 0;
+      view.correct = view.missing = view.wrong = view.late = view.extras = 0;
+      view.hasBlock = view.failAccuracy = view.failExtras = view.failSequence = false;
+      pendingAt = infinity;
+      view.nextBpm = 0;
+      // A different pass bar makes old confirmations incomparable. Keep the clock and phase.
       beginStage (std::ceil (ppq / interval ()) * interval ());
     }
     if (action == Action::Finish) {
@@ -285,8 +299,14 @@ private:
     view.extras = extras;
     view.accuracy = static_cast<double> (good) / blockSize;
     const double extraRate = static_cast<double> (extras) / blockSize;
-    const bool pass = view.sequenceDetected && view.accuracy >= constants::drill::passAccuracy &&
-                      extraRate <= constants::drill::passExtras;
+    const bool okSequence = view.sequenceDetected;
+    const bool okAccuracy = view.accuracy >= view.config.passThreshold;
+    const bool okExtras = extraRate <= constants::drill::passExtras;
+    const bool pass = okSequence && okAccuracy && okExtras;
+    view.hasBlock = true;
+    view.failSequence = !okSequence;
+    view.failAccuracy = !okAccuracy;
+    view.failExtras = !okExtras;
     const bool struggle = view.accuracy < constants::drill::holdAccuracy || extraRate > constants::drill::holdExtras;
     view.passes = pass ? std::min (constants::drill::requiredPasses, view.passes + 1) : 0;
     struggles = struggle ? struggles + 1 : 0;

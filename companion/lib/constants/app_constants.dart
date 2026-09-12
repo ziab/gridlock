@@ -28,6 +28,9 @@ abstract final class AppConstants {
   static const drillKickNote = 36;
   static const double drillToleranceMs = 20;
   static const drillResumeRatio = 0.8;
+  static const drillPassDefault = 0.95;
+  static const drillPassMin = 0.70;
+  static const drillPassMax = 1.0;
 
   static const practiceDefaultSec = 300; // 5 min
   static const practiceStartBpmDefault = 120.0;

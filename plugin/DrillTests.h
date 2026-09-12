@@ -8,6 +8,7 @@ public:
     testProgression ();
     testScoring ();
     testRecovery ();
+    testPassThreshold ();
     testControls ();
     testFreeEntry ();
     testDetection ();
@@ -39,6 +40,15 @@ private:
           e.hit (at, DrumMap::SnareHead);
         }
       }
+      e.advance (at + 0.13, at + 0.13);
+    }
+  }
+  static void playLate (DrillEngine &e, int first, int count, int lateEvery) {
+    // 30 ms drag keeps the tick sequence intact (unlike a missed slot) while counting as a timing error.
+    for (int i = first; i < first + count; ++i) {
+      const double at = 8 + i * constants::musical::ppq_1_16 + (i % lateEvery == lateEvery - 1 ? 0.03 : 0);
+      const int stroke = e.view.state == DrillEngine::State::Waiting ? 0 : (e.view.activeSlot + 1) % 3;
+      e.hit (at, stroke == 2 ? DrumMap::Kick : DrumMap::SnareHead);
       e.advance (at + 0.13, at + 0.13);
     }
   }
@@ -175,6 +185,51 @@ private:
     e.command (DrillEngine::Action::TooFast, config (), 29);
     expect (e.view.bpm >= constants::drill::minBpm);
     expectEquals (e.view.bpm, 60.0);
+  }
+  void testPassThreshold () {
+    beginTest ("A 93% block passes a 90% bar with a clean verdict");
+    auto c = config ();
+    c.passThreshold = 0.90;
+    DrillEngine e;
+    e.command (DrillEngine::Action::Start, c, 0);
+    e.advance (8, 8);
+    playLate (e, 0, 84, 14);
+    expectWithinAbsoluteError (e.view.accuracy, 39.0 / 42.0, 1e-9);
+    expectEquals (e.view.passes, 2);
+    expectEquals (e.view.best, 60.0);
+    expectEquals (e.view.nextBpm, 63.0);
+    expect (e.view.hasBlock && !e.view.failAccuracy && !e.view.failExtras && !e.view.failSequence);
+
+    beginTest ("The same playing fails the default 95% bar with an accuracy verdict");
+    auto d = started ();
+    expect (!d.view.hasBlock);
+    playLate (d, 0, 42, 14);
+    expectEquals (d.view.passes, 0);
+    expect (d.view.hasBlock && d.view.failAccuracy);
+    expect (!d.view.failExtras && !d.view.failSequence);
+    expect (d.view.sequenceDetected);
+
+    beginTest ("Lowering the bar mid-drill confirms the held tempo without restarting");
+    playLate (d, 42, 42, 14);
+    expectEquals (d.view.passes, 0);
+    auto softer = config ();
+    softer.passThreshold = 0.90;
+    d.command (DrillEngine::Action::PassThreshold, softer, 29);
+    expectEquals (d.view.bpm, 60.0);
+    expectEquals (d.view.best, 0.0);
+    expectEquals (d.view.nextBpm, 0.0);
+    expect (!d.view.hasBlock);
+    expect (d.view.sequenceDetected);
+    // Continue on the same grid (index 84 lands exactly on the new origin): stop as soon
+    // as the confirmation schedules so the tempo change is not applied mid-play.
+    int n = 84;
+    for (int k = 0; k < 70 && d.view.nextBpm == 0; ++k) {
+      playLate (d, n, 2, 14);
+      n += 2;
+    }
+    expectEquals (d.view.passes, 2);
+    expectEquals (d.view.best, 60.0);
+    expectEquals (d.view.nextBpm, 63.0);
   }
   void testControls () {
     beginTest ("Silence rearms listening while the click keeps running");
@@ -343,6 +398,7 @@ public:
     testSubdivisions ();
     testIntegration ();
     testTolerance ();
+    testPassThreshold ();
   }
 
 private:
@@ -380,6 +436,34 @@ private:
     expect (p.drillCommand (juce::JSON::parse (R"({"action":"start","pattern":"RLK","spacing":2,"bpm":60})")));
     p.processBlock (audio, midi);
     expectEquals (p.getDrillSnapshot ().config.tolerance, 10.0f);
+  }
+  void testPassThreshold () {
+    beginTest ("Pass bar is configurable at start, live, and visible in snapshots");
+    MidiGridAnalyzerAudioProcessor p;
+    p.prepareToPlay (44100, 512);
+    p.isStandaloneMode = true;
+    p.setDeviceLatencySamples (0, 0);
+    expect (!p.drillCommand (
+        juce::JSON::parse (R"({"action":"start","pattern":"RLK","spacing":2,"bpm":60,"passThreshold":0.5})")));
+    expect (!p.drillCommand (
+        juce::JSON::parse (R"({"action":"start","pattern":"RLK","spacing":2,"bpm":60,"passThreshold":1.5})")));
+    expect (p.drillCommand (
+        juce::JSON::parse (R"({"action":"start","pattern":"RLK","spacing":2,"bpm":60,"passThreshold":0.85})")));
+    juce::AudioBuffer<float> audio (2, 512);
+    juce::MidiBuffer midi;
+    p.processBlock (audio, midi);
+    expectWithinAbsoluteError (p.getDrillSnapshot ().config.passThreshold, 0.85, 1e-9);
+    expect (!p.drillCommand (juce::JSON::parse (R"({"action":"pass_threshold"})")));
+    expect (!p.drillCommand (juce::JSON::parse (R"({"action":"pass_threshold","passThreshold":0.2})")));
+    expect (p.drillCommand (juce::JSON::parse (R"({"action":"pass_threshold","passThreshold":0.9})")));
+    p.processBlock (audio, midi);
+    expectWithinAbsoluteError (p.getDrillSnapshot ().config.passThreshold, 0.9, 1e-9);
+    const auto wire = juce::JSON::parse (p.getDrillStateJson ());
+    expectWithinAbsoluteError (static_cast<double> (wire["passThreshold"]), 0.9, 1e-9);
+    expectEquals (static_cast<int> (wire["requiredPasses"]), constants::drill::requiredPasses);
+    expect (wire.hasProperty ("hasBlock") && wire.hasProperty ("failAccuracy") && wire.hasProperty ("failExtras") &&
+            wire.hasProperty ("failSequence"));
+    expect (p.drillCommand (juce::JSON::parse (R"({"action":"finish"})")));
   }
   void testIntegration () {
     beginTest ("Validated commands, sample clock, MIDI pass-through and editor-independent scoring");

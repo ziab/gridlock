@@ -65,7 +65,10 @@ namespace drill {
 constexpr int maxPattern = 64;
 constexpr int minStrokes = 32;
 constexpr double minSeconds = 10.0;
-constexpr double passAccuracy = 0.95;
+constexpr double passThresholdDefault = 0.95;
+constexpr double passThresholdMin = 0.70;
+constexpr double passThresholdMax = 1.0;
+constexpr double passThresholdStep = 0.01;
 constexpr double holdAccuracy = 0.85;
 constexpr double passExtras = 0.02;
 constexpr double holdExtras = 0.05;

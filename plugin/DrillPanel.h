@@ -41,6 +41,23 @@ public:
       }
     };
     tolerance.setTooltip ("Only this drill. Changing tolerance resets tempo confirmation.");
+    addAndMakeVisible (pass);
+    pass.setRange (constants::drill::passThresholdMin * 100, constants::drill::passThresholdMax * 100,
+                   constants::drill::passThresholdStep * 100);
+    pass.setValue (constants::drill::passThresholdDefault * 100);
+    pass.setTextValueSuffix ("% to pass");
+    pass.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 150, 24);
+    pass.setTooltip ("Only this drill. Changing the pass bar resets tempo confirmation.");
+    pass.onValueChange = [this] {
+      if (processor.isDrillActive ()) {
+        juce::DynamicObject::Ptr message = new juce::DynamicObject ();
+        message->setProperty ("action", "pass_threshold");
+        message->setProperty ("passThreshold", pass.getValue () / 100);
+        processor.drillCommand (juce::var (message.get ()));
+      } else {
+        suggestTempo ();
+      }
+    };
     suggestTempo ();
     setupButton (start, "Start", "start");
     setupButton (hold, "Hold tempo", "hold");
@@ -62,7 +79,7 @@ public:
                   "subdivision; the pattern continues across barlines.",
                   juce::dontSendNotification);
     help.setJustificationType (juce::Justification::centred);
-    setSize (600, 450);
+    setSize (600, 490);
     startTimerHz (constants::network::pollHz);
     timerCallback ();
   }
@@ -76,6 +93,7 @@ public:
       patternLine.setBounds (area.removeFromTop (56));
       help.setBounds (area.removeFromTop (52));
       tolerance.setBounds (area.removeFromTop (36));
+      pass.setBounds (area.removeFromTop (36));
       status.setBounds (area.removeFromTop (110));
       layoutButtons (area);
       return;
@@ -86,6 +104,7 @@ public:
     bpm.setBounds (area.removeFromTop (42));
     kick.setBounds (area.removeFromTop (36));
     tolerance.setBounds (area.removeFromTop (36));
+    pass.setBounds (area.removeFromTop (36));
     help.setBounds (area.removeFromTop (52));
     status.setBounds (area.removeFromTop (110));
     layoutButtons (area);
@@ -95,7 +114,7 @@ private:
   MidiGridAnalyzerAudioProcessor &processor;
   juce::TextEditor pattern;
   juce::ComboBox spacing;
-  juce::Slider bpm, kick, tolerance;
+  juce::Slider bpm, kick, tolerance, pass;
   juce::Label status, help, headline, patternLine;
   bool liveLayout{false};
   juce::TextButton start, hold, slower, pause, retry, finish;
@@ -113,7 +132,8 @@ private:
   }
   void suggestTempo () {
     bpm.setValue (processor.drillHistory.suggestion (pattern.getText (), spacing.getSelectedId () - 1,
-                                                     static_cast<int> (kick.getValue ()), tolerance.getValue ()));
+                                                     static_cast<int> (kick.getValue ()), tolerance.getValue (),
+                                                     pass.getValue () / 100));
   }
   void setupButton (juce::TextButton &button, const char *title, const char *action) {
     button.setButtonText (title);
@@ -130,6 +150,7 @@ private:
       message->setProperty ("bpm", bpm.getValue ());
       message->setProperty ("kick", kick.getValue ());
       message->setProperty ("tolerance", tolerance.getValue ());
+      message->setProperty ("passThreshold", pass.getValue () / 100);
       error = processor.drillCommand (juce::var (message.get ())) ? "" : "Enter 1–64 R/L/K letters and valid settings.";
     };
   }
@@ -148,6 +169,9 @@ private:
       kick.setValue (s.config.kick, juce::dontSendNotification);
       if (!tolerance.isMouseButtonDown ()) {
         tolerance.setValue (s.config.tolerance, juce::dontSendNotification);
+      }
+      if (!pass.isMouseButtonDown ()) {
+        pass.setValue (s.config.passThreshold * 100, juce::dontSendNotification);
       }
       const int id = s.config.interval == constants::musical::ppq_1_8    ? 1
                      : s.config.interval == constants::musical::ppq_1_8T ? 2
@@ -194,12 +218,31 @@ private:
         text += s.sequenceDetected ? " | Sequence detected" : s.sequenceSeen ? " | Sequence lost" : " | Listening";
       }
       text += "\nWindow: " + juce::String (s.toleranceMs, 1) + " ms (drill only)";
+      text += "\nNeed ≥" + juce::String (static_cast<int> (std::round (s.config.passThreshold * 100))) +
+              "% + locked sequence, 2 in a row";
       text += "\nHighest confirmed: " + (s.best > 0 ? juce::String (s.best, 0) : "none") + " | " +
               juce::String (s.passes) + "/2 passes";
       text += " | Block " + juce::String (s.progress * 100, 0) + "%";
       text += "\nLast block: " + juce::String (s.accuracy * 100, 0) + "% | Miss " + juce::String (s.missing) +
               " Wrong " + juce::String (s.wrong) + " Timing " + juce::String (s.late) + " Extra " +
               juce::String (s.extras);
+      if (s.hasBlock) {
+        if (!s.failAccuracy && !s.failExtras && !s.failSequence) {
+          text += " — pass";
+        } else {
+          juce::StringArray reasons;
+          if (s.failAccuracy) {
+            reasons.add ("need ≥" + juce::String (static_cast<int> (std::round (s.config.passThreshold * 100))) + "%");
+          }
+          if (s.failExtras) {
+            reasons.add ("too many extras");
+          }
+          if (s.failSequence) {
+            reasons.add ("sequence not locked");
+          }
+          text += " — " + reasons.joinIntoString (", ");
+        }
+      }
       if (s.nextBpm > 0) {
         text += "\nNext repeat: " + juce::String (s.nextBpm, 0) + " BPM";
       }

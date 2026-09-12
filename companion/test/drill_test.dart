@@ -53,6 +53,12 @@ void main() {
             'automatic': false,
             'toleranceOverride': 32,
             'tolerance': 28,
+            'passThreshold': 0.9,
+            'requiredPasses': 2,
+            'hasBlock': true,
+            'failAccuracy': true,
+            'failExtras': false,
+            'failSequence': false,
             'sequenceDetected': true,
             'sequenceSeen': true,
           }),
@@ -71,6 +77,11 @@ void main() {
         expect(connection.drill.best, 81);
         expect(connection.drill.toleranceOverride, 32);
         expect(connection.drill.tolerance, 28);
+        expect(connection.drill.passThreshold, 0.9);
+        expect(connection.drill.hasBlock, isTrue);
+        expect(connection.drill.failAccuracy, isTrue);
+        expect(connection.drill.failExtras, isFalse);
+        expect(connection.drill.failSequence, isFalse);
         expect(connection.drill.sequenceDetected, isTrue);
         expect(connection.drill.automatic, isFalse);
         connection.setParameter('internal_bpm', 150);
@@ -112,6 +123,7 @@ void main() {
     await tester.tap(find.text('Start'));
     await tester.pump();
     expect(connection.commands, ['start']);
+    expect(connection.sentSettings.last['passThreshold'], 0.95);
     expect(tester.takeException(), isNull);
   });
 
@@ -194,8 +206,8 @@ void main() {
       );
       await tester.pump();
       expect(find.text('● Sequence detected'), findsOneWidget);
-      await tester.ensureVisible(find.byType(Slider));
-      await tester.tap(find.byType(Slider));
+      await tester.ensureVisible(find.byType(Slider).first);
+      await tester.tap(find.byType(Slider).first);
       await tester.pump();
       expect(connection.commands.last, 'tolerance');
       expect(connection.sentSettings.last['tolerance'], isNot(12));
@@ -218,6 +230,68 @@ void main() {
       await tester.ensureVisible(find.text('Start'));
       await tester.tap(find.text('Start'));
       expect(connection.sentSettings.last['tolerance'], 12);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Live pass bar shows the threshold, verdict, and sends adjustments',
+    (tester) async {
+      final connection = DrillConnection();
+      connection.publish(
+        const DrillState(
+          state: 'playing',
+          pattern: 'RLK',
+          bpm: 60,
+          accuracy: 0.91,
+          passes: 0,
+          passThreshold: 0.95,
+          hasBlock: true,
+          failAccuracy: true,
+          missing: 0,
+          wrong: 0,
+          late: 3,
+          extras: 0,
+        ),
+      );
+      await tester.pumpWidget(
+        ChangeNotifierProvider<ConnectionService>.value(
+          value: connection,
+          child: const MaterialApp(home: DrillScreen()),
+        ),
+      );
+      expect(
+        find.text('Need ≥95% + locked sequence, 2 in a row'),
+        findsOneWidget,
+      );
+      expect(find.text('Last block: 91% — need ≥95%'), findsOneWidget);
+      expect(
+        find.text('Pass bar: ≥95% on time and correct'),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.byType(Slider).at(1));
+      await tester.tap(find.byType(Slider).at(1));
+      await tester.pump();
+      expect(connection.commands.last, 'pass_threshold');
+      final sent = connection.sentSettings.last['passThreshold'];
+      expect(sent, isA<double>());
+      expect((sent as double), inInclusiveRange(0.7, 1.0));
+      connection.publish(
+        const DrillState(
+          state: 'playing',
+          pattern: 'RLK',
+          accuracy: 1,
+          passes: 1,
+          hasBlock: true,
+          failSequence: true,
+          sequenceSeen: true,
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.text('Last block: 100% — sequence not locked'),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );

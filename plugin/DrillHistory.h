@@ -12,13 +12,15 @@ public:
       records = juce::var (new juce::DynamicObject ());
     }
   }
-  static juce::String key (const juce::String &pattern, int spacing, int kick, double tolerance) {
+  static juce::String key (const juce::String &pattern, int spacing, int kick, double tolerance, double passThreshold) {
     return pattern.removeCharacters (" \t\r\n").toUpperCase () + ":" + juce::String (spacing) + ":" +
-           juce::String (kick) + ":" + juce::String (static_cast<int> (std::round (tolerance * 10)));
+           juce::String (kick) + ":" + juce::String (static_cast<int> (std::round (tolerance * 10))) + ":" +
+           juce::String (static_cast<int> (std::round (passThreshold * 100)));
   }
-  double suggestion (const juce::String &pattern, int spacing, int kick, double tolerance) const {
+  double suggestion (const juce::String &pattern, int spacing, int kick, double tolerance, double passThreshold) const {
     std::lock_guard<std::mutex> lock (mutex);
-    const double best = static_cast<double> (records[juce::Identifier (key (pattern, spacing, kick, tolerance))]);
+    const double best =
+        static_cast<double> (records[juce::Identifier (key (pattern, spacing, kick, tolerance, passThreshold))]);
     return best > 0       ? std::clamp (std::floor (best * constants::drill::resumeRatio), constants::drill::minBpm,
                                         static_cast<double> (constants::params::bpmMax))
            : spacing == 0 ? constants::drill::eighthStartBpm
@@ -32,8 +34,9 @@ public:
         const int spacing = s.config.interval == constants::musical::ppq_1_8    ? 0
                             : s.config.interval == constants::musical::ppq_1_8T ? 1
                                                                                 : 2;
-        records.getDynamicObject ()->setProperty (
-            key (juce::String (s.config.pattern.data ()), spacing, s.config.kick, s.config.tolerance), s.best);
+        records.getDynamicObject ()->setProperty (key (juce::String (s.config.pattern.data ()), spacing, s.config.kick,
+                                                       s.config.tolerance, s.config.passThreshold),
+                                                  s.best);
         file ().getParentDirectory ().createDirectory ();
         file ().replaceWithText (juce::JSON::toString (records));
       }

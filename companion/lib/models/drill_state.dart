@@ -5,11 +5,17 @@ class DrillState {
   final double bpm, best, attempted, nextBpm, progress, accuracy;
   final int passes, activeSlot, beatsRemaining, missing, wrong, late, extras;
   final bool automatic, noHits, limitReached, sequenceDetected, sequenceSeen;
-  final double toleranceOverride, tolerance;
+  final bool hasBlock, failAccuracy, failExtras, failSequence;
+  final double toleranceOverride, tolerance, passThreshold;
 
   const DrillState({
     this.toleranceOverride = AppConstants.drillToleranceMs,
     this.tolerance = AppConstants.drillToleranceMs,
+    this.passThreshold = AppConstants.drillPassDefault,
+    this.hasBlock = false,
+    this.failAccuracy = false,
+    this.failExtras = false,
+    this.failSequence = false,
     this.sequenceDetected = false,
     this.sequenceSeen = false,
     this.state = 'idle',
@@ -43,6 +49,13 @@ class DrillState {
       tolerance:
           (json['tolerance'] as num?)?.toDouble() ??
           AppConstants.drillToleranceMs,
+      passThreshold:
+          (json['passThreshold'] as num?)?.toDouble() ??
+          AppConstants.drillPassDefault,
+      hasBlock: json['hasBlock'] as bool? ?? false,
+      failAccuracy: json['failAccuracy'] as bool? ?? false,
+      failExtras: json['failExtras'] as bool? ?? false,
+      failSequence: json['failSequence'] as bool? ?? false,
       sequenceDetected: json['sequenceDetected'] as bool? ?? false,
       sequenceSeen: json['sequenceSeen'] as bool? ?? false,
       state: json['state'] as String? ?? 'idle',

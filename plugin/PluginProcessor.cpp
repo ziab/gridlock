@@ -828,6 +828,12 @@ bool MidiGridAnalyzerAudioProcessor::parseDrillConfig (const juce::var &message,
       config.tolerance > constants::params::toleranceMax) {
     return false;
   }
+  config.passThreshold = message.hasProperty ("passThreshold") ? static_cast<double> (message["passThreshold"])
+                                                               : constants::drill::passThresholdDefault;
+  if (!std::isfinite (config.passThreshold) || config.passThreshold < constants::drill::passThresholdMin ||
+      config.passThreshold > constants::drill::passThresholdMax) {
+    return false;
+  }
   const double sr = getSampleRate () > 0 ? getSampleRate () : constants::params::sampleRateFallback;
   config.latencyMs = params.userLatencyMs + getDeviceLatencyMs (sr) + getLatencySamples () * 1000.0 / sr;
   return true;
@@ -849,6 +855,14 @@ bool MidiGridAnalyzerAudioProcessor::drillCommand (const juce::var &message) {
     if (!message.hasProperty ("tolerance") || !std::isfinite (command.config.tolerance) ||
         command.config.tolerance < constants::params::toleranceMin ||
         command.config.tolerance > constants::params::toleranceMax) {
+      return false;
+    }
+  } else if (action == "pass_threshold") {
+    command.action = DrillEngine::Action::PassThreshold;
+    command.config.passThreshold = static_cast<double> (message["passThreshold"]);
+    if (!message.hasProperty ("passThreshold") || !std::isfinite (command.config.passThreshold) ||
+        command.config.passThreshold < constants::drill::passThresholdMin ||
+        command.config.passThreshold > constants::drill::passThresholdMax) {
       return false;
     }
   } else if (action == "hold") {
@@ -925,6 +939,12 @@ juce::String MidiGridAnalyzerAudioProcessor::getDrillStateJson () {
   obj->setProperty ("limitReached", s.limitReached);
   obj->setProperty ("tolerance", s.toleranceMs);
   obj->setProperty ("toleranceOverride", s.config.tolerance);
+  obj->setProperty ("passThreshold", s.config.passThreshold);
+  obj->setProperty ("requiredPasses", constants::drill::requiredPasses);
+  obj->setProperty ("hasBlock", s.hasBlock);
+  obj->setProperty ("failAccuracy", s.failAccuracy);
+  obj->setProperty ("failExtras", s.failExtras);
+  obj->setProperty ("failSequence", s.failSequence);
   obj->setProperty ("sequenceDetected", s.sequenceDetected);
   obj->setProperty ("sequenceSeen", s.sequenceSeen);
   return juce::JSON::toString (juce::var (obj.get ()));

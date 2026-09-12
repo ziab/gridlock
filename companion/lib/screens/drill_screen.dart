@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../services/connection_service.dart';
+import '../models/drill_state.dart';
+import '../widgets/drill_pass.dart';
 import '../widgets/drill_tolerance.dart';
 
 class DrillScreen extends StatefulWidget {
@@ -21,6 +23,7 @@ class _DrillScreenState extends State<DrillScreen> {
   );
   final _form = GlobalKey<FormState>();
   int _spacing = 2;
+  double _pass = AppConstants.drillPassDefault;
 
   @override
   void initState() {
@@ -36,7 +39,8 @@ class _DrillScreenState extends State<DrillScreen> {
     final tolerance =
         context.read<ConnectionService>().parameters['tolerance_ms']?.value ??
         AppConstants.drillToleranceMs;
-    final key = '$pattern:$_spacing:${_kick.text}:${(tolerance * 10).round()}';
+    final key =
+        '$pattern:$_spacing:${_kick.text}:${(tolerance * 10).round()}:${(_pass * 100).round()}';
     final best = context.read<ConnectionService>().drillHistory[key];
     _bpm.text = best == null
         ? (_spacing == 0
@@ -121,14 +125,14 @@ class _DrillScreenState extends State<DrillScreen> {
             ),
           ),
           DrillTolerance(connection: connection),
+          DrillPassThreshold(connection: connection),
         ],
         Text(_status(connection), textAlign: TextAlign.center),
         const SizedBox(height: 12),
         LinearProgressIndicator(value: drill.progress),
+        Text(_passBar(drill)),
         Text('${drill.passes} of 2 blocks passed'),
-        Text(
-          'Last block: ${(drill.accuracy * 100).round()}% on time and correct',
-        ),
+        Text(_verdict(drill)),
         Text(
           'Missed ${drill.missing} · Wrong type ${drill.wrong} · Timing ${drill.late} · Extra ${drill.extras}',
         ),
@@ -163,6 +167,21 @@ class _DrillScreenState extends State<DrillScreen> {
         _button(connection, 'Finish', 'finish'),
       ],
     );
+  }
+
+  String _passBar(DrillState drill) =>
+      'Need ≥${(drill.passThreshold * 100).round()}% + locked sequence, 2 in a row';
+
+  String _verdict(DrillState drill) {
+    final last = 'Last block: ${(drill.accuracy * 100).round()}%';
+    if (!drill.hasBlock) return '$last on time and correct';
+    final reasons = <String>[
+      if (drill.failAccuracy)
+        'need ≥${(drill.passThreshold * 100).round()}%',
+      if (drill.failExtras) 'too many extras',
+      if (drill.failSequence) 'sequence not locked',
+    ];
+    return reasons.isEmpty ? '$last — pass' : '$last — ${reasons.join(', ')}';
   }
 
   String _status(ConnectionService connection) {
@@ -246,6 +265,29 @@ class _DrillScreenState extends State<DrillScreen> {
         Text(
           'Drill tolerance starts at ${connection.parameters['tolerance_ms']?.value ?? AppConstants.drillToleranceMs} ms. Adjust it live after Start.',
         ),
+        Row(
+          children: [
+            Expanded(
+              child: Slider(
+                value: _pass,
+                min: AppConstants.drillPassMin,
+                max: AppConstants.drillPassMax,
+                divisions:
+                    ((AppConstants.drillPassMax - AppConstants.drillPassMin) *
+                            100)
+                        .round(),
+                label: '${(_pass * 100).round()}% to pass',
+                onChanged: (value) {
+                  setState(() {
+                    _pass = value;
+                    _suggestTempo();
+                  });
+                },
+              ),
+            ),
+            Text('${(_pass * 100).round()}% to pass'),
+          ],
+        ),
         _advanced(),
         const SizedBox(height: 12),
         FilledButton(
@@ -262,6 +304,7 @@ class _DrillScreenState extends State<DrillScreen> {
                       'tolerance':
                           connection.parameters['tolerance_ms']?.value ??
                           AppConstants.drillToleranceMs,
+                      'passThreshold': _pass,
                     },
                   );
                 }
