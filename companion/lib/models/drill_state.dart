@@ -6,12 +6,13 @@ class DrillState {
   final int passes, activeSlot, beatsRemaining, missing, wrong, late, extras;
   final bool automatic, noHits, limitReached, sequenceDetected, sequenceSeen;
   final bool hasBlock, failAccuracy, failExtras, failSequence;
-  final double toleranceOverride, tolerance, passThreshold;
+  final double toleranceOverride, tolerance, passThreshold, stepBpm;
 
   const DrillState({
     this.toleranceOverride = AppConstants.drillToleranceMs,
     this.tolerance = AppConstants.drillToleranceMs,
     this.passThreshold = AppConstants.drillPassDefault,
+    this.stepBpm = AppConstants.drillStepDefault,
     this.hasBlock = false,
     this.failAccuracy = false,
     this.failExtras = false,
@@ -53,6 +54,9 @@ class DrillState {
       passThreshold:
           (json['passThreshold'] as num?)?.toDouble() ??
           AppConstants.drillPassDefault,
+      stepBpm:
+          (json['stepBpm'] as num?)?.toDouble() ??
+          AppConstants.drillStepDefault,
       hasBlock: json['hasBlock'] as bool? ?? false,
       failAccuracy: json['failAccuracy'] as bool? ?? false,
       failExtras: json['failExtras'] as bool? ?? false,

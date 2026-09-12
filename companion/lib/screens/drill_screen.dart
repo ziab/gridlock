@@ -25,6 +25,7 @@ class _DrillScreenState extends State<DrillScreen> {
   final _form = GlobalKey<FormState>();
   int _spacing = 2;
   double _pass = AppConstants.drillPassDefault;
+  double _step = AppConstants.drillStepDefault;
   double? _tolerance;
 
   @override
@@ -43,6 +44,7 @@ class _DrillScreenState extends State<DrillScreen> {
     setState(() {
       _spacing = saved.spacing;
       _pass = saved.passThreshold;
+      _step = saved.step;
       _tolerance = saved.tolerance;
       _kick.text = saved.kick.toString();
       _pattern.text = saved.pattern;
@@ -351,6 +353,27 @@ class _DrillScreenState extends State<DrillScreen> {
             Text('${(_pass * 100).round()}% to pass'),
           ],
         ),
+        Row(
+          children: [
+            Expanded(
+              child: Slider(
+                value: _step,
+                min: AppConstants.drillStepMin,
+                max: AppConstants.drillStepMax,
+                divisions:
+                    (AppConstants.drillStepMax - AppConstants.drillStepMin)
+                        .round(),
+                label: '${_step.round()} BPM climb',
+                onChanged: (value) {
+                  setState(() {
+                    _step = value;
+                  });
+                },
+              ),
+            ),
+            Text('${_step.round()} BPM climb'),
+          ],
+        ),
         _advanced(),
         const SizedBox(height: 12),
         FilledButton(
@@ -367,6 +390,7 @@ class _DrillScreenState extends State<DrillScreen> {
                       'kick': int.tryParse(_kick.text) ?? -1,
                       'tolerance': tolerance,
                       'passThreshold': _pass,
+                      'step': _step,
                     },
                   );
                   await DrillSettings(
@@ -378,6 +402,7 @@ class _DrillScreenState extends State<DrillScreen> {
                         AppConstants.drillKickNote,
                     tolerance: tolerance,
                     passThreshold: _pass,
+                    step: _step,
                   ).save();
                 }
               : null,

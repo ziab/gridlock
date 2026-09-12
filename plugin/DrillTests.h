@@ -10,6 +10,7 @@ public:
     testRecovery ();
     testPassThreshold ();
     testSessionFloor ();
+    testStepSize ();
     testControls ();
     testFreeEntry ();
     testDetection ();
@@ -151,7 +152,7 @@ private:
     return next;
   }
   void testRecovery () {
-    beginTest ("Struggling after a climb steps back to confirmed tempo but stays automatic");
+    beginTest ("Struggling after a climb holds the earned tempo and stays automatic");
     auto e = started ();
     play (e, 0, 84);
     expectEquals (e.view.best, 60.0);
@@ -159,33 +160,29 @@ private:
     int next = forwardToBoundary (e, 84);
     expectEquals (e.view.bpm, 63.0);
     expect (e.view.automatic);
-    // Stop as soon as the step-back schedules: advancing past the pending
-    // boundary would apply the tempo change mid-play.
-    for (int k = 0; k < 70 && e.view.nextBpm == 0; ++k) {
+    // Nothing ever schedules: the loop runs to its cap while the tempo holds.
+    for (int k = 0; k < 50; ++k) {
       play (e, next, 2, 2);
       next += 2;
     }
     expectEquals (e.view.bpm, 63.0);
-    expectEquals (e.view.nextBpm, 60.0);
+    expectEquals (e.view.nextBpm, 0.0);
+    expectEquals (e.view.best, 60.0);
     expect (e.view.automatic && !e.view.limitReached);
-    expect (e.view.bpm >= constants::drill::minBpm);
 
-    beginTest ("Clean playing after a step-back climbs again");
-    next = forwardToBoundary (e, next);
-    expectEquals (e.view.bpm, 60.0);
-    expect (e.view.automatic);
-    for (int k = 0; k < 70 && e.view.nextBpm == 0; ++k) {
+    beginTest ("Clean playing at the held tempo confirms it and climbs on");
+    for (int k = 0; k < 80 && e.view.nextBpm == 0; ++k) {
       play (e, next, 2);
       next += 2;
     }
-    expectEquals (e.view.best, 60.0);
-    expectEquals (e.view.nextBpm, 63.0);
+    expectEquals (e.view.best, 63.0);
+    expectEquals (e.view.nextBpm, 66.0);
 
-    beginTest ("Tempo never drops below the 60 BPM floor");
+    beginTest ("Manual Too fast still drops to the best, floored at the start tempo");
     e = started ();
     e.command (DrillEngine::Action::TooFast, config (), 29);
-    expect (e.view.bpm >= constants::drill::minBpm);
     expectEquals (e.view.bpm, 60.0);
+    expectEquals (e.view.floorBpm, 60.0);
   }
   void testPassThreshold () {
     beginTest ("A 93% block passes a 90% bar with a clean verdict");
@@ -249,12 +246,13 @@ private:
     expectEquals (e.view.nextBpm, 93.0);
     n = forwardToBoundary (e, n);
     expectEquals (e.view.bpm, 93.0);
-    for (int k = 0; k < 80 && e.view.nextBpm == 0; ++k) {
+    for (int k = 0; k < 50; ++k) {
       play (e, n, 2, 2);
       n += 2;
     }
     expectEquals (e.view.bpm, 93.0);
-    expectEquals (e.view.nextBpm, 90.0);
+    expectEquals (e.view.nextBpm, 0.0);
+    expectEquals (e.view.best, 90.0);
     expect (e.view.automatic && !e.view.limitReached);
 
     beginTest ("Too fast without confirmation holds the start tempo");
@@ -264,7 +262,7 @@ private:
     f.command (DrillEngine::Action::TooFast, config (), 29);
     expectEquals (f.view.bpm, 90.0);
 
-    beginTest ("Hesitation steps back 3x the climb and holds at the floor");
+    beginTest ("Climbed tempos survive hesitation, then confirm higher");
     auto g = started ();
     int m = 0;
     for (int climb = 0; climb < 4; ++climb) {
@@ -275,28 +273,32 @@ private:
       m = forwardToBoundary (g, m);
     }
     expectEquals (g.view.bpm, 72.0);
-    for (int k = 0; k < 70 && g.view.nextBpm == 0; ++k) {
+    expectEquals (g.view.best, 69.0);
+    for (int k = 0; k < 50; ++k) {
       play (g, m, 2, 2);
       m += 2;
     }
     expectEquals (g.view.bpm, 72.0);
-    expectEquals (g.view.nextBpm, 63.0);
-    expect (g.view.automatic);
-    m = forwardToBoundary (g, m);
-    expectEquals (g.view.bpm, 63.0);
-    for (int k = 0; k < 70 && g.view.nextBpm == 0; ++k) {
-      play (g, m, 2, 2);
-      m += 2;
-    }
-    expectEquals (g.view.nextBpm, 60.0);
-    m = forwardToBoundary (g, m);
-    for (int k = 0; k < 70 && g.view.nextBpm == 0; ++k) {
-      play (g, m, 2, 2);
-      m += 2;
-    }
-    expectEquals (g.view.bpm, 60.0);
     expectEquals (g.view.nextBpm, 0.0);
-    expect (g.view.automatic && !g.view.limitReached);
+    expect (g.view.automatic);
+    for (int k = 0; k < 80 && g.view.nextBpm == 0; ++k) {
+      play (g, m, 2);
+      m += 2;
+    }
+    expectEquals (g.view.best, 72.0);
+    expectEquals (g.view.nextBpm, 75.0);
+  }
+  void testStepSize () {
+    beginTest ("Climb size comes from setup");
+    auto c = config ();
+    c.stepBpm = 5;
+    DrillEngine e;
+    e.command (DrillEngine::Action::Start, c, 0);
+    e.advance (8, 8);
+    expectEquals (e.view.config.stepBpm, 5.0);
+    play (e, 0, 84);
+    expectEquals (e.view.best, 60.0);
+    expectEquals (e.view.nextBpm, 65.0);
   }
   void testControls () {
     beginTest ("Silence rearms listening while the click keeps running");
@@ -466,6 +468,7 @@ public:
     testIntegration ();
     testTolerance ();
     testPassThreshold ();
+    testStepSize ();
   }
 
 private:
@@ -530,6 +533,25 @@ private:
     expectEquals (static_cast<int> (wire["requiredPasses"]), constants::drill::requiredPasses);
     expect (wire.hasProperty ("hasBlock") && wire.hasProperty ("failAccuracy") && wire.hasProperty ("failExtras") &&
             wire.hasProperty ("failSequence"));
+    expect (p.drillCommand (juce::JSON::parse (R"({"action":"finish"})")));
+  }
+  void testStepSize () {
+    beginTest ("Climb size is validated at start and visible in snapshots");
+    MidiGridAnalyzerAudioProcessor p;
+    p.prepareToPlay (44100, 512);
+    p.isStandaloneMode = true;
+    p.setDeviceLatencySamples (0, 0);
+    expect (
+        !p.drillCommand (juce::JSON::parse (R"({"action":"start","pattern":"RLK","spacing":2,"bpm":60,"step":0})")));
+    expect (
+        !p.drillCommand (juce::JSON::parse (R"({"action":"start","pattern":"RLK","spacing":2,"bpm":60,"step":11})")));
+    expect (p.drillCommand (juce::JSON::parse (R"({"action":"start","pattern":"RLK","spacing":2,"bpm":60,"step":5})")));
+    juce::AudioBuffer<float> audio (2, 512);
+    juce::MidiBuffer midi;
+    p.processBlock (audio, midi);
+    expectWithinAbsoluteError (p.getDrillSnapshot ().config.stepBpm, 5.0, 1e-9);
+    const auto wire = juce::JSON::parse (p.getDrillStateJson ());
+    expectWithinAbsoluteError (static_cast<double> (wire["stepBpm"]), 5.0, 1e-9);
     expect (p.drillCommand (juce::JSON::parse (R"({"action":"finish"})")));
   }
   void testIntegration () {

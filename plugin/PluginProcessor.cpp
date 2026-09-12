@@ -834,6 +834,11 @@ bool MidiGridAnalyzerAudioProcessor::parseDrillConfig (const juce::var &message,
       config.passThreshold > constants::drill::passThresholdMax) {
     return false;
   }
+  config.stepBpm = message.hasProperty ("step") ? static_cast<double> (message["step"]) : constants::drill::bpmStep;
+  if (!std::isfinite (config.stepBpm) || config.stepBpm < constants::drill::bpmStepMin ||
+      config.stepBpm > constants::drill::bpmStepMax) {
+    return false;
+  }
   const double sr = getSampleRate () > 0 ? getSampleRate () : constants::params::sampleRateFallback;
   config.latencyMs = params.userLatencyMs + getDeviceLatencyMs (sr) + getLatencySamples () * 1000.0 / sr;
   return true;
@@ -941,6 +946,7 @@ juce::String MidiGridAnalyzerAudioProcessor::getDrillStateJson () {
   obj->setProperty ("tolerance", s.toleranceMs);
   obj->setProperty ("toleranceOverride", s.config.tolerance);
   obj->setProperty ("passThreshold", s.config.passThreshold);
+  obj->setProperty ("stepBpm", s.config.stepBpm);
   obj->setProperty ("requiredPasses", constants::drill::requiredPasses);
   obj->setProperty ("hasBlock", s.hasBlock);
   obj->setProperty ("failAccuracy", s.failAccuracy);

@@ -58,6 +58,13 @@ public:
         suggestTempo ();
       }
     };
+    addAndMakeVisible (step);
+    step.setRange (constants::drill::bpmStepMin, constants::drill::bpmStepMax, 1);
+    step.setValue (constants::drill::bpmStep);
+    step.setTextValueSuffix (" BPM climb");
+    step.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 150, 24);
+    step.setTooltip ("Climb size per confirmation. Setup only; cannot change mid-drill.");
+    step.onValueChange = [this] { suggestTempo (); };
     suggestTempo ();
     setupButton (start, "Start", "start");
     setupButton (hold, "Hold tempo", "hold");
@@ -79,7 +86,7 @@ public:
                   "subdivision; the pattern continues across barlines.",
                   juce::dontSendNotification);
     help.setJustificationType (juce::Justification::centred);
-    setSize (600, 490);
+    setSize (600, 500);
     startTimerHz (constants::network::pollHz);
     timerCallback ();
   }
@@ -105,6 +112,7 @@ public:
     kick.setBounds (area.removeFromTop (36));
     tolerance.setBounds (area.removeFromTop (36));
     pass.setBounds (area.removeFromTop (36));
+    step.setBounds (area.removeFromTop (36));
     help.setBounds (area.removeFromTop (52));
     status.setBounds (area.removeFromTop (110));
     layoutButtons (area);
@@ -114,7 +122,7 @@ private:
   MidiGridAnalyzerAudioProcessor &processor;
   juce::TextEditor pattern;
   juce::ComboBox spacing;
-  juce::Slider bpm, kick, tolerance, pass;
+  juce::Slider bpm, kick, tolerance, pass, step;
   juce::Label status, help, headline, patternLine;
   bool liveLayout{false};
   juce::TextButton start, hold, slower, pause, retry, finish;
@@ -151,13 +159,14 @@ private:
       message->setProperty ("kick", kick.getValue ());
       message->setProperty ("tolerance", tolerance.getValue ());
       message->setProperty ("passThreshold", pass.getValue () / 100);
+      message->setProperty ("step", step.getValue ());
       error = processor.drillCommand (juce::var (message.get ())) ? "" : "Enter 1–64 R/L/K letters and valid settings.";
     };
   }
   void timerCallback () override {
     const auto s = processor.getDrillSnapshot ();
     const bool active = s.state != DrillEngine::State::Idle && s.state != DrillEngine::State::Finished;
-    for (auto *control : std::array<juce::Component *, 5>{&pattern, &spacing, &bpm, &kick, &start}) {
+    for (auto *control : std::array<juce::Component *, 6>{&pattern, &spacing, &bpm, &kick, &step, &start}) {
       control->setEnabled (!active);
     }
     for (auto *control : {&hold, &slower, &pause, &retry, &finish}) {
@@ -184,7 +193,7 @@ private:
         tolerance.setValue (processor.getAPVTS ().getRawParameterValue ("tolerance_ms")->load (),
                             juce::dontSendNotification);
       }
-      for (auto *control : std::array<juce::Component *, 4>{&pattern, &spacing, &bpm, &kick}) {
+      for (auto *control : std::array<juce::Component *, 5>{&pattern, &spacing, &bpm, &kick, &step}) {
         control->setVisible (!active);
       }
       headline.setVisible (active);

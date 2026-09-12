@@ -19,6 +19,7 @@ public:
     double interval{constants::musical::ppq_1_16}, bpm{constants::drill::startBpm};
     float tolerance{constants::params::toleranceDefault};
     double passThreshold{constants::drill::passThresholdDefault};
+    double stepBpm{constants::drill::bpmStep};
     double latencyMs{0};
     int clickSubdivisionIndex () const {
       return interval == constants::musical::ppq_1_8 ? 2 : interval == constants::musical::ppq_1_8T ? 4 : 3;
@@ -317,25 +318,18 @@ private:
     if (view.passes >= constants::drill::requiredPasses) {
       view.best = std::max (view.best, view.bpm);
       if (view.automatic && view.bpm < constants::params::bpmMax) {
-        schedule (std::min<double> (constants::params::bpmMax, view.bpm + constants::drill::bpmStep), physicalPpq);
+        schedule (std::min<double> (constants::params::bpmMax, view.bpm + view.config.stepBpm), physicalPpq);
       } else {
         view.automatic = false;
       }
     } else if (view.automatic &&
                (struggles >= constants::drill::requiredStruggles || view.blocks >= constants::drill::maxBlocks)) {
-      // Step back 3x the climb so there is time to adjust, but never below the
-      // session floor (the start tempo). Stay automatic so clean playing climbs again.
-      const double target = std::clamp (view.bpm - constants::drill::bpmStepDown, view.floorBpm,
-                                        static_cast<double> (constants::params::bpmMax));
-      if (view.best > 0 && target < view.bpm - 1e-9) {
-        schedule (target, physicalPpq);
-        view.limitReached = false;
-      } else {
-        // Nothing confirmed yet, or already at the floor: hold and keep listening.
-        struggles = 0;
-        view.blocks = 0;
-        view.limitReached = false;
-      }
+      // Never step back automatically: a climbed tempo is earned and kept. Hold it,
+      // stay automatic, and let clean playing climb again. Only an explicit Too fast
+      // takes the tempo down (to the best, floored at the session start).
+      struggles = 0;
+      view.blocks = 0;
+      view.limitReached = false;
     }
   }
   void schedule (double bpm, double ppq) {

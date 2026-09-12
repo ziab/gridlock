@@ -42,6 +42,7 @@ void main() {
       kick: 38,
       tolerance: 25,
       passThreshold: 0.85,
+      step: 5,
     );
     await saved.save();
     final loaded = await DrillSettings.load();
@@ -51,6 +52,7 @@ void main() {
     expect(loaded.kick, 38);
     expect(loaded.tolerance, 25);
     expect(loaded.passThreshold, 0.85);
+    expect(loaded.step, 5);
     SharedPreferences.setMockInitialValues({});
     expect((await DrillSettings.load()).bpm, isNull);
   });
@@ -63,6 +65,7 @@ void main() {
       'drill.kick': 38,
       'drill.tolerance': 25.0,
       'drill.pass': 0.85,
+      'drill.step': 5.0,
     });
     final connection = DrillConnection();
     await tester.pumpWidget(
@@ -76,6 +79,7 @@ void main() {
     expect(find.text('84.0'), findsOneWidget);
     expect(find.text('85% to pass'), findsOneWidget);
     expect(find.text('±25.0 ms'), findsOneWidget);
+    expect(find.text('5 BPM climb'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -97,10 +101,12 @@ void main() {
     expect(connection.commands.last, 'start');
     expect(connection.sentSettings.last['tolerance'], 20.0);
     expect(connection.sentSettings.last['passThreshold'], 0.95);
+    expect(connection.sentSettings.last['step'], 3.0);
     final remembered = await DrillSettings.load();
     expect(remembered.pattern, 'RLK');
     expect(remembered.tolerance, 20.0);
     expect(remembered.passThreshold, 0.95);
+    expect(remembered.step, 3.0);
     expect(tester.takeException(), isNull);
   });
 
@@ -135,6 +141,7 @@ void main() {
             'failAccuracy': true,
             'failExtras': false,
             'failSequence': false,
+            'stepBpm': 5,
             'sequenceDetected': true,
             'sequenceSeen': true,
           }),
@@ -158,6 +165,7 @@ void main() {
         expect(connection.drill.failAccuracy, isTrue);
         expect(connection.drill.failExtras, isFalse);
         expect(connection.drill.failSequence, isFalse);
+        expect(connection.drill.stepBpm, 5);
         expect(connection.drill.sequenceDetected, isTrue);
         expect(connection.drill.automatic, isFalse);
         connection.setParameter('internal_bpm', 150);

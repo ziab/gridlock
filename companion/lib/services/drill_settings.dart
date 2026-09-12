@@ -10,6 +10,7 @@ class DrillSettings {
   final int kick;
   final double? tolerance;
   final double passThreshold;
+  final double step;
 
   const DrillSettings({
     this.pattern = 'RLK',
@@ -18,6 +19,7 @@ class DrillSettings {
     this.kick = AppConstants.drillKickNote,
     this.tolerance,
     this.passThreshold = AppConstants.drillPassDefault,
+    this.step = AppConstants.drillStepDefault,
   });
 
   static Future<DrillSettings> load() async {
@@ -30,6 +32,7 @@ class DrillSettings {
       tolerance: prefs.getDouble('drill.tolerance'),
       passThreshold:
           prefs.getDouble('drill.pass') ?? AppConstants.drillPassDefault,
+      step: prefs.getDouble('drill.step') ?? AppConstants.drillStepDefault,
     );
   }
 
@@ -45,5 +48,6 @@ class DrillSettings {
       await prefs.setDouble('drill.tolerance', tolerance!);
     }
     await prefs.setDouble('drill.pass', passThreshold);
+    await prefs.setDouble('drill.step', step);
   }
 }
