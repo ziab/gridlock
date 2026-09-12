@@ -221,7 +221,7 @@ private:
       text += "\nNeed ≥" + juce::String (static_cast<int> (std::round (s.config.passThreshold * 100))) +
               "% + locked sequence, 2 in a row";
       text += "\nHighest confirmed: " + (s.best > 0 ? juce::String (s.best, 0) : "none") + " | " +
-              juce::String (s.passes) + "/2 passes";
+              juce::String (s.passes) + "/2 passes | Floor " + juce::String (s.floorBpm, 0);
       text += " | Block " + juce::String (s.progress * 100, 0) + "%";
       text += "\nLast block: " + juce::String (s.accuracy * 100, 0) + "% | Miss " + juce::String (s.missing) +
               " Wrong " + juce::String (s.wrong) + " Timing " + juce::String (s.late) + " Extra " +

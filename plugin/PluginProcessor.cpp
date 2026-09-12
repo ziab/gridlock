@@ -924,6 +924,7 @@ juce::String MidiGridAnalyzerAudioProcessor::getDrillStateJson () {
   obj->setProperty ("best", s.best);
   obj->setProperty ("attempted", s.attempted);
   obj->setProperty ("nextBpm", s.nextBpm);
+  obj->setProperty ("floorBpm", s.floorBpm);
   obj->setProperty ("progress", s.progress);
   obj->setProperty ("accuracy", s.accuracy);
   obj->setProperty ("passes", s.passes);

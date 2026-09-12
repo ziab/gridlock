@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gridlock_companion/models/drill_state.dart';
 import 'package:gridlock_companion/models/parameter.dart';
 import 'package:gridlock_companion/screens/drill_screen.dart';
+import 'package:gridlock_companion/services/drill_settings.dart';
 import 'package:gridlock_companion/widgets/status_bar.dart' as app;
 import 'package:gridlock_companion/services/connection_service.dart';
 
@@ -28,6 +30,80 @@ class DrillConnection extends ConnectionService {
 }
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  test('DrillSettings round-trips the last setup through prefs', () async {
+    const saved = DrillSettings(
+      pattern: 'KKRL',
+      spacing: 1,
+      bpm: 84,
+      kick: 38,
+      tolerance: 25,
+      passThreshold: 0.85,
+    );
+    await saved.save();
+    final loaded = await DrillSettings.load();
+    expect(loaded.pattern, 'KKRL');
+    expect(loaded.spacing, 1);
+    expect(loaded.bpm, 84);
+    expect(loaded.kick, 38);
+    expect(loaded.tolerance, 25);
+    expect(loaded.passThreshold, 0.85);
+    SharedPreferences.setMockInitialValues({});
+    expect((await DrillSettings.load()).bpm, isNull);
+  });
+
+  testWidgets('Setup restores the remembered drill settings', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'drill.pattern': 'KKRL',
+      'drill.spacing': 1,
+      'drill.bpm': 84.0,
+      'drill.kick': 38,
+      'drill.tolerance': 25.0,
+      'drill.pass': 0.85,
+    });
+    final connection = DrillConnection();
+    await tester.pumpWidget(
+      ChangeNotifierProvider<ConnectionService>.value(
+        value: connection,
+        child: const MaterialApp(home: DrillScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('KKRL'), findsOneWidget);
+    expect(find.text('84.0'), findsOneWidget);
+    expect(find.text('85% to pass'), findsOneWidget);
+    expect(find.text('±25.0 ms'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Setup tolerance is sent on start and remembered', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final connection = DrillConnection();
+    await tester.pumpWidget(
+      ChangeNotifierProvider<ConnectionService>.value(
+        value: connection,
+        child: const MaterialApp(home: DrillScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Start'));
+    await tester.tap(find.text('Start'));
+    await tester.pumpAndSettle();
+    expect(connection.commands.last, 'start');
+    expect(connection.sentSettings.last['tolerance'], 20.0);
+    expect(connection.sentSettings.last['passThreshold'], 0.95);
+    final remembered = await DrillSettings.load();
+    expect(remembered.pattern, 'RLK');
+    expect(remembered.tolerance, 20.0);
+    expect(remembered.passThreshold, 0.95);
+    expect(tester.takeException(), isNull);
+  });
+
   test(
     'Server snapshots restore an existing drill and commands preserve its session',
     () async {

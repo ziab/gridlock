@@ -2,7 +2,7 @@ import '../constants/app_constants.dart';
 
 class DrillState {
   final String state, pattern;
-  final double bpm, best, attempted, nextBpm, progress, accuracy;
+  final double bpm, best, attempted, nextBpm, floorBpm, progress, accuracy;
   final int passes, activeSlot, beatsRemaining, missing, wrong, late, extras;
   final bool automatic, noHits, limitReached, sequenceDetected, sequenceSeen;
   final bool hasBlock, failAccuracy, failExtras, failSequence;
@@ -24,6 +24,7 @@ class DrillState {
     this.best = 0,
     this.attempted = 0,
     this.nextBpm = 0,
+    this.floorBpm = AppConstants.drillStartBpm,
     this.progress = 0,
     this.accuracy = 0,
     this.passes = 0,
@@ -64,6 +65,7 @@ class DrillState {
       best: number('best'),
       attempted: number('attempted'),
       nextBpm: number('nextBpm'),
+      floorBpm: (json['floorBpm'] as num?)?.toDouble() ?? number('bpm'),
       progress: number('progress').clamp(0, 1),
       accuracy: number('accuracy'),
       passes: number('passes').toInt(),

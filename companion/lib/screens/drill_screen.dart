@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../services/connection_service.dart';
+import '../services/drill_settings.dart';
 import '../models/drill_state.dart';
 import '../widgets/drill_pass.dart';
 import '../widgets/drill_tolerance.dart';
@@ -24,6 +25,7 @@ class _DrillScreenState extends State<DrillScreen> {
   final _form = GlobalKey<FormState>();
   int _spacing = 2;
   double _pass = AppConstants.drillPassDefault;
+  double? _tolerance;
 
   @override
   void initState() {
@@ -32,13 +34,36 @@ class _DrillScreenState extends State<DrillScreen> {
       controller.addListener(_suggestTempo);
     }
     _suggestTempo();
+    _restore();
+  }
+
+  Future<void> _restore() async {
+    final saved = await DrillSettings.load();
+    if (!mounted) return;
+    setState(() {
+      _spacing = saved.spacing;
+      _pass = saved.passThreshold;
+      _tolerance = saved.tolerance;
+      _kick.text = saved.kick.toString();
+      _pattern.text = saved.pattern;
+      if (saved.bpm != null) {
+        _bpm.text = saved.bpm.toString();
+      } else {
+        _suggestTempo();
+      }
+    });
+  }
+
+  double _setupTolerance() {
+    final main =
+        context.read<ConnectionService>().parameters['tolerance_ms']?.value ??
+        AppConstants.drillToleranceMs;
+    return _tolerance ?? main;
   }
 
   void _suggestTempo() {
     final pattern = _pattern.text.replaceAll(RegExp(r'\s'), '').toUpperCase();
-    final tolerance =
-        context.read<ConnectionService>().parameters['tolerance_ms']?.value ??
-        AppConstants.drillToleranceMs;
+    final tolerance = _setupTolerance();
     final key =
         '$pattern:$_spacing:${_kick.text}:${(tolerance * 10).round()}:${(_pass * 100).round()}';
     final best = context.read<ConnectionService>().drillHistory[key];
@@ -143,6 +168,7 @@ class _DrillScreenState extends State<DrillScreen> {
               : 'No tempo confirmed yet',
         ),
         Text('Highest attempted: ${drill.attempted.round()} BPM'),
+        Text('Session floor: ${drill.floorBpm.round()} BPM'),
         if (drill.nextBpm > 0)
           Text('Next repeat: ${drill.nextBpm.round()} BPM'),
         if (drill.active) _actions(connection),
@@ -262,8 +288,45 @@ class _DrillScreenState extends State<DrillScreen> {
           },
         ),
         _number(_bpm, 'Start BPM', AppConstants.bpmMin, AppConstants.bpmMax),
-        Text(
-          'Drill tolerance starts at ${connection.parameters['tolerance_ms']?.value ?? AppConstants.drillToleranceMs} ms. Adjust it live after Start.',
+        Builder(
+          builder: (context) {
+            final tolerance = _setupTolerance().clamp(
+              AppConstants.toleranceMin,
+              AppConstants.toleranceMax,
+            );
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Slider(
+                        value: tolerance,
+                        min: AppConstants.toleranceMin,
+                        max: AppConstants.toleranceMax,
+                        divisions:
+                            ((AppConstants.toleranceMax -
+                                        AppConstants.toleranceMin) *
+                                    2)
+                                .round(),
+                        label: '±${tolerance.toStringAsFixed(1)} ms',
+                        onChanged: (value) {
+                          setState(() {
+                            _tolerance = value;
+                            _suggestTempo();
+                          });
+                        },
+                      ),
+                    ),
+                    Text('±${tolerance.toStringAsFixed(1)} ms'),
+                  ],
+                ),
+                const Text(
+                  'Start tolerance and pass bar apply to this drill only. Adjust both live after Start.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            );
+          },
         ),
         Row(
           children: [
@@ -292,8 +355,9 @@ class _DrillScreenState extends State<DrillScreen> {
         const SizedBox(height: 12),
         FilledButton(
           onPressed: connection.isConnected
-              ? () {
+              ? () async {
                   if (!_form.currentState!.validate()) return;
+                  final tolerance = _setupTolerance();
                   connection.drillCommand(
                     'start',
                     settings: {
@@ -301,12 +365,20 @@ class _DrillScreenState extends State<DrillScreen> {
                       'spacing': _spacing,
                       'bpm': double.parse(_bpm.text),
                       'kick': int.tryParse(_kick.text) ?? -1,
-                      'tolerance':
-                          connection.parameters['tolerance_ms']?.value ??
-                          AppConstants.drillToleranceMs,
+                      'tolerance': tolerance,
                       'passThreshold': _pass,
                     },
                   );
+                  await DrillSettings(
+                    pattern: _pattern.text,
+                    spacing: _spacing,
+                    bpm: double.parse(_bpm.text),
+                    kick:
+                        int.tryParse(_kick.text) ??
+                        AppConstants.drillKickNote,
+                    tolerance: tolerance,
+                    passThreshold: _pass,
+                  ).save();
                 }
               : null,
           child: const Text('Start'),

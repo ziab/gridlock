@@ -13,6 +13,7 @@ dependencies:
   provider: ^6.1.2
   google_fonts: ^6.2.1
   wakelock_plus: ^1.2.8
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

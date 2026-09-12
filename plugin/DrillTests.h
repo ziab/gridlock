@@ -9,6 +9,7 @@ public:
     testScoring ();
     testRecovery ();
     testPassThreshold ();
+    testSessionFloor ();
     testControls ();
     testFreeEntry ();
     testDetection ();
@@ -230,6 +231,72 @@ private:
     expectEquals (d.view.passes, 2);
     expectEquals (d.view.best, 60.0);
     expectEquals (d.view.nextBpm, 63.0);
+  }
+  void testSessionFloor () {
+    beginTest ("The session floor is the start tempo, not a hardcoded value");
+    DrillEngine e;
+    auto ninety = config ();
+    ninety.bpm = 90;
+    e.command (DrillEngine::Action::Start, ninety, 0);
+    e.advance (8, 8);
+    expectEquals (e.view.floorBpm, 90.0);
+    int n = 0;
+    for (int k = 0; k < 80 && e.view.nextBpm == 0; ++k) {
+      play (e, n, 2);
+      n += 2;
+    }
+    expectEquals (e.view.best, 90.0);
+    expectEquals (e.view.nextBpm, 93.0);
+    n = forwardToBoundary (e, n);
+    expectEquals (e.view.bpm, 93.0);
+    for (int k = 0; k < 80 && e.view.nextBpm == 0; ++k) {
+      play (e, n, 2, 2);
+      n += 2;
+    }
+    expectEquals (e.view.bpm, 93.0);
+    expectEquals (e.view.nextBpm, 90.0);
+    expect (e.view.automatic && !e.view.limitReached);
+
+    beginTest ("Too fast without confirmation holds the start tempo");
+    DrillEngine f;
+    f.command (DrillEngine::Action::Start, ninety, 0);
+    f.advance (8, 8);
+    f.command (DrillEngine::Action::TooFast, config (), 29);
+    expectEquals (f.view.bpm, 90.0);
+
+    beginTest ("Hesitation steps back 3x the climb and holds at the floor");
+    auto g = started ();
+    int m = 0;
+    for (int climb = 0; climb < 4; ++climb) {
+      for (int k = 0; k < 60 && g.view.nextBpm == 0; ++k) {
+        play (g, m, 2);
+        m += 2;
+      }
+      m = forwardToBoundary (g, m);
+    }
+    expectEquals (g.view.bpm, 72.0);
+    for (int k = 0; k < 70 && g.view.nextBpm == 0; ++k) {
+      play (g, m, 2, 2);
+      m += 2;
+    }
+    expectEquals (g.view.bpm, 72.0);
+    expectEquals (g.view.nextBpm, 63.0);
+    expect (g.view.automatic);
+    m = forwardToBoundary (g, m);
+    expectEquals (g.view.bpm, 63.0);
+    for (int k = 0; k < 70 && g.view.nextBpm == 0; ++k) {
+      play (g, m, 2, 2);
+      m += 2;
+    }
+    expectEquals (g.view.nextBpm, 60.0);
+    m = forwardToBoundary (g, m);
+    for (int k = 0; k < 70 && g.view.nextBpm == 0; ++k) {
+      play (g, m, 2, 2);
+      m += 2;
+    }
+    expectEquals (g.view.bpm, 60.0);
+    expectEquals (g.view.nextBpm, 0.0);
+    expect (g.view.automatic && !g.view.limitReached);
   }
   void testControls () {
     beginTest ("Silence rearms listening while the click keeps running");

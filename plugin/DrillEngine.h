@@ -27,7 +27,7 @@ public:
   struct Snapshot {
     Config config;
     State state{State::Idle};
-    double bpm{constants::drill::startBpm}, best{0}, attempted{0}, nextBpm{0};
+    double bpm{constants::drill::startBpm}, best{0}, attempted{0}, nextBpm{0}, floorBpm{constants::drill::startBpm};
     double progress{0}, accuracy{0}, toleranceMs{20};
     int passes{0}, blocks{0}, activeSlot{0}, beatsRemaining{0};
     int correct{0}, missing{0}, wrong{0}, late{0}, extras{0}, expected{0};
@@ -53,6 +53,7 @@ public:
       view.config = config;
       view.bpm = config.bpm;
       view.attempted = config.bpm;
+      view.floorBpm = config.bpm;
       waitForFirstHit (ppq);
       return;
     }
@@ -211,7 +212,8 @@ private:
   }
   double fallbackBpm () const {
     const double raw = view.best > 0 ? view.best : std::floor (view.bpm * constants::drill::resumeRatio);
-    return std::clamp (raw, constants::drill::minBpm, static_cast<double> (constants::params::bpmMax));
+    // The session never drops below its start tempo.
+    return std::clamp (raw, view.floorBpm, static_cast<double> (constants::params::bpmMax));
   }
   void loseSequence () {
     if (view.sequenceDetected) {
@@ -321,18 +323,15 @@ private:
       }
     } else if (view.automatic &&
                (struggles >= constants::drill::requiredStruggles || view.blocks >= constants::drill::maxBlocks)) {
-      const double confirmed =
-          std::clamp (view.best, constants::drill::minBpm, static_cast<double> (constants::params::bpmMax));
-      if (view.best > 0 && confirmed < view.bpm - 1e-9) {
-        // Climbed above a proven tempo then struggled: step back to the confirmed
-        // tempo but stay automatic so clean playing climbs again. Slower is not
-        // easier, so never drop below what was already proven.
-        schedule (confirmed, physicalPpq);
+      // Step back 3x the climb so there is time to adjust, but never below the
+      // session floor (the start tempo). Stay automatic so clean playing climbs again.
+      const double target = std::clamp (view.bpm - constants::drill::bpmStepDown, view.floorBpm,
+                                        static_cast<double> (constants::params::bpmMax));
+      if (view.best > 0 && target < view.bpm - 1e-9) {
+        schedule (target, physicalPpq);
         view.limitReached = false;
       } else {
-        // Nothing confirmed yet: hold the starting tempo and keep listening.
-        // Auto-dropping to ~48 BPM traps players at a harder-to-play tempo
-        // with increases locked out.
+        // Nothing confirmed yet, or already at the floor: hold and keep listening.
         struggles = 0;
         view.blocks = 0;
         view.limitReached = false;
